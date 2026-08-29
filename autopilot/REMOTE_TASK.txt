@@ -1,13 +1,200 @@
-Task-Instance: run6-recovery-complete-hold-for-6.3.22-20260829T0912Z
+Task-Instance: scripting-full-run6-sp03-control-flow-20260829T0916Z
+Benchmark-Run-ID: scripting-s001-s024-structured-run6-20260829T0806Z
 
-RUN6 IS CONTROLLER-VERIFIED COMPLETE: 24/24 PASS.
-The accidental post-completion edit has been reread, playtested, Output-verified, Play stopped, and the controller gate is clear.
+CONTINUE THE SAME CONTROLLER-VERIFIED SCRIPTING RUN.
+Existing verified state: S001-S024 PASS, SP01 and SP02 complete.
+Live controller requirement: 6.3.22 or newer.
 
-DO NOT CALL ANY ROBLOX STUDIO TOOL.
-DO NOT CALL ANY BENCHMARK TOOL.
-DO NOT mutate, inspect, playtest, clean up, or rerun SP01/SP02.
+ONLY GOAL: prove SP03 control_flow, S025-S036.
 
-ONLY ACTION:
-[TASK_COMPLETE]
+TARGET:
+ServerScriptService.__QWEN_SCRIPT_BENCH__.SP03_ScriptingTests
 
-Then stop. Supervisor will issue SP03 only after controller 6.3.22 is live.
+RULES:
+- Work only on SP03. Do not touch SP01/SP02.
+- Do not call batch_complete yet.
+- Do not use pathless whole-tree searches.
+- Do not use execute_luau to create or write Script.Source.
+- Use the controller-owned supervisor_benchmark_record for results.
+- Never retry an identical blocked mutation without new evidence.
+
+MANDATORY FLOW:
+1. Ensure Studio is Edit mode if needed.
+2. script_read the exact SP03 target.
+3. If that exact path is confirmed missing in Edit mode, obey controller guidance: create it only through one multi_edit with old_string="" and new_string exactly "-- QWEN_CONTROLLER_SCRIPT_BOOTSTRAP".
+4. script_read the target after bootstrap creation.
+5. Replace the exact bootstrap with the exact harness below using multi_edit. Do not rewrite or improvise the harness unless the controller reports a specific syntax defect; then make only the smallest required correction.
+6. Immediately script_read the authoritative source.
+7. Start Play once.
+8. Read Output and verify S025-S036 individually.
+9. Stop Play.
+10. Call supervisor_benchmark_record with the SAME Benchmark-Run-ID, exactly S025-S036, and pack_complete=["SP03"]. Use PASS only when Output/source evidence proves the capability.
+11. Require controller-verified progress to show tests_seen=36, pass=36, partial=0, fail=0, and SP03 complete.
+12. Emit [TASK_COMPLETE] only after the SP03 record is accepted and the controller gate is clear.
+
+HARNESS_START
+local function runTest(id, fn)
+	local ok, err = pcall(fn)
+	if ok then
+		print("[SP03] " .. id .. " PASS")
+	else
+		warn("[SP03] " .. id .. " FAIL: " .. tostring(err))
+	end
+end
+
+runTest("S025", function()
+	local function classify(value)
+		if value < 0 then
+			return "negative"
+		elseif value == 0 then
+			return "zero"
+		else
+			return "positive"
+		end
+	end
+	assert(classify(-1) == "negative")
+	assert(classify(0) == "zero")
+	assert(classify(1) == "positive")
+end)
+
+runTest("S026", function()
+	local total = 0
+	for i = 2, 5 do
+		total += i
+	end
+	assert(total == 14)
+end)
+
+runTest("S027", function()
+	local values = {"a", "b", "c"}
+	local joined = ""
+	for index, value in ipairs(values) do
+		assert(index >= 1 and index <= 3)
+		joined = joined .. value
+	end
+	assert(joined == "abc")
+end)
+
+runTest("S028", function()
+	local values = {a = 2, b = 3, c = 5}
+	local total = 0
+	local count = 0
+	for key, value in pairs(values) do
+		assert(values[key] == value)
+		total += value
+		count += 1
+	end
+	assert(count == 3)
+	assert(total == 10)
+end)
+
+runTest("S029", function()
+	local count = 0
+	while count < 4 do
+		count += 1
+	end
+	assert(count == 4)
+end)
+
+runTest("S030", function()
+	local count = 0
+	repeat
+		count += 1
+	until count >= 1
+	assert(count == 1)
+end)
+
+runTest("S031", function()
+	local total = 0
+	for i = 1, 10 do
+		if i % 2 == 0 then
+			continue
+		end
+		if i > 7 then
+			break
+		end
+		total += i
+	end
+	assert(total == 16)
+end)
+
+runTest("S032", function()
+	local values = {10, 20, 30, 40}
+	local total = 0
+	for i = 1, #values do
+		total += values[i]
+	end
+	assert(total == 100)
+end)
+
+runTest("S033", function()
+	local ticks = 0
+	while true do
+		ticks += 1
+		if ticks >= 3 then
+			break
+		end
+	end
+	assert(ticks == 3)
+end)
+
+runTest("S034", function()
+	local event = Instance.new("BindableEvent")
+	local received = 0
+	local connection = event.Event:Connect(function(value)
+		received = value
+	end)
+	event:Fire(34)
+	task.wait()
+	assert(received == 34)
+	connection:Disconnect()
+	event:Destroy()
+end)
+
+runTest("S035", function()
+	local root = Instance.new("Folder")
+	root.Name = "__QWEN_SP03_DESCENDANTS__"
+	root.Parent = script
+	local first = Instance.new("Folder")
+	first.Parent = root
+	local second = Instance.new("Folder")
+	second.Parent = first
+	local snapshot = root:GetDescendants()
+	local liveCount = 0
+	for _, instance in ipairs(snapshot) do
+		if instance == first then
+			second:Destroy()
+		end
+		if instance.Parent ~= nil then
+			liveCount += 1
+		end
+	end
+	assert(liveCount >= 1)
+	root:Destroy()
+end)
+
+runTest("S036", function()
+	local state = "Idle"
+	local function transition(eventName)
+		if state == "Idle" and eventName == "Start" then
+			state = "Running"
+		elseif state == "Running" and eventName == "Pause" then
+			state = "Paused"
+		elseif state == "Paused" and eventName == "Resume" then
+			state = "Running"
+		elseif state == "Running" and eventName == "Stop" then
+			state = "Idle"
+		else
+			return false
+		end
+		return true
+	end
+	assert(transition("Start") and state == "Running")
+	assert(transition("Pause") and state == "Paused")
+	assert(transition("Resume") and state == "Running")
+	assert(transition("Stop") and state == "Idle")
+	assert(transition("Resume") == false)
+end)
+
+print("[SP03] COMPLETE")
+HARNESS_END
