@@ -20,4 +20,4 @@ tests/
 latest.json
 ```
 
-Current stable controller: **6.0.0**
+Current stable controller: **6.3.0**
