@@ -39,8 +39,8 @@ import urllib.request
 from pathlib import Path
 from typing import Any
 
-APP_NAME = "Qwen Roblox Enforced Proxy V6.3.9"
-VERSION = "6.3.9"
+APP_NAME = "Qwen Roblox Enforced Proxy V6.3.10"
+VERSION = "6.3.10"
 
 LOCALAPPDATA = Path(os.environ.get("LOCALAPPDATA", str(Path.home())))
 STATE_DIR = LOCALAPPDATA / "QwenRobloxEnforcedProxy"
@@ -949,7 +949,7 @@ _PUBLIC_LONG_TOKEN_RE = re.compile(r"\b[A-Za-z0-9+/_=-]{64,}\b")
 _PUBLIC_LOG_ALLOW_RE = re.compile(
     r"(?i)(?:"
     r"\[AUTOPILOT\]|MCP READY|HEADLESS (?:SESSION|ROLLOVER) PROMPT SENT|"
-    r"TASK_COMPLETE|BENCH:|BENCH_BATCH_COMPLETE|cycle=|rollover|generation|restart|controller|manager|"
+    r"TASK_COMPLETE|BENCH:|BENCH_PACK_COMPLETE|BENCH_BATCH_COMPLETE|cycle=|rollover|generation|restart|controller|manager|"
     r"model|tool error|result_error|mcp|warn|error|fail|connected|disconnected"
     r")"
 )
@@ -1169,22 +1169,40 @@ _BENCH_MARKER_RE = re.compile(
     re.IGNORECASE,
 )
 _BENCH_BATCH_RE = re.compile(r"\[BENCH_BATCH_COMPLETE:([^\]]{1,160})\]", re.IGNORECASE)
+_BENCH_PACK_RE = re.compile(r"\[BENCH_PACK_COMPLETE:([^\]]{1,160})\]", re.IGNORECASE)
 
 
 def _benchmark_progress_from_events(events: list[str]) -> dict[str, Any]:
     by_id: dict[str, dict[str, Any]] = {}
     batches: list[str] = []
+    packs: list[str] = []
     for line in events:
-        text = str(line or "")
-        for match in _BENCH_MARKER_RE.finditer(text):
+        text = str(line or "").strip()
+
+        # Only accept standalone result/completion lines. This prevents the
+        # benchmark instructions themselves from being mistaken for completed
+        # work merely because they contain example markers.
+        match = _BENCH_MARKER_RE.fullmatch(text)
+        if match:
             test_id = match.group(1).upper()
             status = match.group(2).upper()
             reason = _public_safe_string(match.group(3) or "", 500)
             by_id[test_id] = {"status": status, "reason": reason}
-        for match in _BENCH_BATCH_RE.finditer(text):
+            continue
+
+        match = _BENCH_PACK_RE.fullmatch(text)
+        if match:
+            pack = _public_safe_string(match.group(1), 160)
+            if pack and pack not in packs:
+                packs.append(pack)
+            continue
+
+        match = _BENCH_BATCH_RE.fullmatch(text)
+        if match:
             batch = _public_safe_string(match.group(1), 160)
             if batch and batch not in batches:
                 batches.append(batch)
+
     passed = sum(1 for row in by_id.values() if row.get("status") == "PASS")
     partial = sum(1 for row in by_id.values() if row.get("status") == "PARTIAL")
     failed = sum(1 for row in by_id.values() if row.get("status") == "FAIL")
@@ -1193,6 +1211,7 @@ def _benchmark_progress_from_events(events: list[str]) -> dict[str, Any]:
         "pass": passed,
         "partial": partial,
         "fail": failed,
+        "pack_complete_markers": packs[-20:],
         "batch_complete_markers": batches[-10:],
         "results": dict(sorted(by_id.items())[-100:]),
     }
@@ -5393,6 +5412,23 @@ def self_test_main() -> int:
         failures.append(f"V6.3.9 benchmark marker counts wrong: {bench_progress!r}")
     if "script-01-a" not in (bench_progress.get("batch_complete_markers") or []):
         failures.append(f"V6.3.9 benchmark batch marker missing: {bench_progress!r}")
+
+    # V6.3.10 regression: benchmark prompt text must not be counted as
+    # completion; only standalone concrete result/completion markers count.
+    bench_progress = _benchmark_progress_from_events([
+        "3. Emit [BENCH_BATCH_COMPLETE:fake-prompt-marker]",
+        "[BENCH:S001:PASS]",
+        "[BENCH_PACK_COMPLETE:SP01]",
+        "[BENCH_BATCH_COMPLETE:real-batch]",
+    ])
+    if bench_progress.get("pass") != 1 or bench_progress.get("tests_seen") != 1:
+        failures.append(f"V6.3.10 benchmark result parsing wrong: {bench_progress!r}")
+    if "fake-prompt-marker" in (bench_progress.get("batch_complete_markers") or []):
+        failures.append(f"V6.3.10 prompt text falsely counted as completion: {bench_progress!r}")
+    if "SP01" not in (bench_progress.get("pack_complete_markers") or []):
+        failures.append(f"V6.3.10 pack completion marker missing: {bench_progress!r}")
+    if "real-batch" not in (bench_progress.get("batch_complete_markers") or []):
+        failures.append(f"V6.3.10 real batch completion marker missing: {bench_progress!r}")
 
     # V6.3 regression: controller-bug packets are eligible for automatic
     # GitHub handoff, while non-controller failures are not.
