@@ -2021,8 +2021,12 @@ def script_creation_policy_reason(name: str, args: dict[str, Any] | None) -> str
     """
     n = (name or "").lower()
     if n == "execute_luau":
-        raw = json_text(args or {})
-        if re.search(r"Instance\s*\.\s*new\s*\(\s*['\"](?:Script|LocalScript|ModuleScript)['\"]", raw, re.IGNORECASE):
+        code = (args or {}).get("code")
+        if isinstance(code, str) and re.search(
+            r"Instance\s*\.\s*new\s*\(\s*['\"](?:Script|LocalScript|ModuleScript)['\"]",
+            code,
+            re.IGNORECASE,
+        ):
             return (
                 "Blocked: Script/LocalScript/ModuleScript creation through execute_luau is not allowed. "
                 f"Use create_instances with Source exactly {SCRIPT_BOOTSTRAP_SOURCE!r}, then call script_read "
