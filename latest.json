@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
-  "version": "6.3.2",
+  "version": "6.3.3",
   "channel": "stable",
   "controller_path": "stable/controller.py",
-  "release_path": "releases/6.3.2/controller.py",
-  "sha256": "af264f68565d5c5cabaa6d0242394ead7baabe06a97d2676aeb1e869918b7d8f",
-  "published_at": "2026-08-29T04:53:00Z",
-  "notes": "Prevents a stale repair_applied static-source blocker from deadlocking post-repair verification after Play starts. The verification gate is authoritative through Play, Output, runtime evidence, and visual checks, including across controller/autopilot restarts."
+  "release_path": "releases/6.3.3/controller.py",
+  "sha256": "2c0eef7854089b291f6789d1a8a986444f6a28b07ad39e80343873fb2447f978",
+  "published_at": "2026-08-29T05:09:00Z",
+  "notes": "Prevents runtime-verification Play lock. Runtime gates now name only the still-missing evidence, allow Stop Play as a safe escape without discarding verification state, allow Play to resume verification, and classify repeated wrong actions against a satisfiable runtime gate as a model/policy loop instead of a controller deadlock."
 }
