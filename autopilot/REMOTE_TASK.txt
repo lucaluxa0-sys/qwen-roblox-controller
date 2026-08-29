@@ -1,20 +1,29 @@
-Task-Instance: hold-sp07-for-immutable-benchmark-6.3.28-20260829T1120Z
+Task-Instance: sp07-a-b-class-audit-20260829T1125Z
 Benchmark-Run-ID: scripting-s001-s024-structured-run6-20260829T0806Z
 
-PAUSE SP07 UNTIL CONTROLLER 6.3.28 IS LIVE.
+CONTROLLER 6.3.28 IS LIVE AND DISK/LIVE MATCH. SP07 AUDIT ONLY.
 
-Reason: an already-decided capability reason was rewritten during a hold. 6.3.28 makes each S### decision fully immutable inside the active run.
+Audit exactly:
+- ServerScriptService.__QWEN_SCRIPT_BENCH__.SP07_A
+- ServerScriptService.__QWEN_SCRIPT_BENCH__.SP07_B
 
-DO NOT call Roblox Studio tools.
-DO NOT call supervisor_benchmark_record.
-DO NOT mutate anything.
-
-ONLY:
-1. supervisor_decision_trace:
-   goal="Hold SP07 until immutable benchmark evidence controller is live"
-   evidence=["S001-S080 are already decided and must remain immutable","controller 6.3.28 is pending activation"]
-   decision="Stop without changing Studio or benchmark telemetry"
-   next_action="await fresh SP07 recovery task after heartbeat proves 6.3.28 live"
+ACTIONS:
+1. script_read SP07_A once.
+2. inspect_instance SP07_A once and capture exact ClassName.
+3. script_read SP07_B once.
+4. inspect_instance SP07_B once and capture exact ClassName.
+5. Call supervisor_decision_trace with:
+   goal="Audit SP07_A and SP07_B classes after legacy missing-path creation"
+   evidence containing the exact observed ClassName and whether source equals "-- QWEN_CONTROLLER_SCRIPT_BOOTSTRAP" for each object
+   decision="Report the audit without mutating anything"
+   actual_result="SP07_A=<ClassName/source-state>; SP07_B=<ClassName/source-state>"
+   next_action="supervisor will repair any wrong class before SP07 continues"
    confidence="high"
-2. Emit [TASK_COMPLETE]
-3. Stop.
+6. Emit [TASK_COMPLETE] and stop.
+
+FORBIDDEN:
+- any mutation
+- Play
+- benchmark reporting
+- inspecting anything else
+- touching SP01-SP06
