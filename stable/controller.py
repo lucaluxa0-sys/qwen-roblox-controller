@@ -39,8 +39,8 @@ import urllib.request
 from pathlib import Path
 from typing import Any
 
-APP_NAME = "Qwen Roblox Enforced Proxy V6.3.18"
-VERSION = "6.3.18"
+APP_NAME = "Qwen Roblox Enforced Proxy V6.3.19"
+VERSION = "6.3.19"
 
 LOCALAPPDATA = Path(os.environ.get("LOCALAPPDATA", str(Path.home())))
 STATE_DIR = LOCALAPPDATA / "QwenRobloxEnforcedProxy"
@@ -64,6 +64,7 @@ TELEMETRY_ACTION_HISTORY_FILE = TELEMETRY_DIR / "action_history.jsonl"
 TELEMETRY_HEALTH_FILE = TELEMETRY_DIR / "controller_health.json"
 TELEMETRY_TEST_RESULTS_FILE = TELEMETRY_DIR / "test_results.json"
 TELEMETRY_AUTOPILOT_FILE = TELEMETRY_DIR / "autopilot_runs.jsonl"
+TELEMETRY_QWEN_PERFORMANCE_FILE = TELEMETRY_DIR / "qwen_performance_history.jsonl"
 TELEMETRY_FAILURE_PACKET_FILE = TELEMETRY_DIR / "failure_packet.json"
 TELEMETRY_REGRESSION_CASES_FILE = TELEMETRY_DIR / "regression_cases.jsonl"
 TELEMETRY_GITHUB_REPORTER_FILE = TELEMETRY_DIR / "github_reporter_status.json"
@@ -127,6 +128,8 @@ MCP_PROXY_AUTO_RESTART_LIMIT = int(os.environ.get("QWEN_MCP_PROXY_AUTO_RESTART_L
 MCP_PROXY_RESTART_EXIT_CODE = int(os.environ.get("QWEN_MCP_PROXY_RESTART_EXIT_CODE", "75"))
 TELEMETRY_MAX_STRING = int(os.environ.get("QWEN_TELEMETRY_MAX_STRING", "12000"))
 TELEMETRY_HISTORY_TAIL = int(os.environ.get("QWEN_TELEMETRY_HISTORY_TAIL", "30"))
+QWEN_PERF_SAMPLER_INTERVAL = max(0.25, float(os.environ.get("QWEN_PERF_SAMPLER_INTERVAL", "1.0")))
+QWEN_PERF_HISTORY_TAIL = max(5, min(60, int(os.environ.get("QWEN_PERF_HISTORY_TAIL", "20"))))
 
 # Context management. In normal LM Studio UI/MCP mode the proxy cannot see the
 # model's private reasoning or the complete chat transcript, so the meter there
@@ -1085,9 +1088,246 @@ def _public_full_auto_health(raw: dict[str, Any]) -> dict[str, Any]:
     return out
 
 
+def _runner_numeric_metrics(raw: dict[str, Any]) -> dict[str, float | int]:
+    """Expose only safe numeric runner timing/token metrics, never prompts or source."""
+    out: dict[str, float | int] = {}
+    metric_re = re.compile(
+        r"(?:token|tps|speed|seconds?|duration|latency|eval|prompt|completion|generation|cycle|time)",
+        re.IGNORECASE,
+    )
+    deny_re = re.compile(r"(?:pid|port|sha|hash|id$)", re.IGNORECASE)
+
+    def add(prefix: str, mapping: dict[str, Any]) -> None:
+        for key, value in mapping.items():
+            name = f"{prefix}{key}" if prefix else str(key)
+            if deny_re.search(name) or not metric_re.search(name):
+                continue
+            if isinstance(value, bool) or not isinstance(value, (int, float)):
+                continue
+            if not isinstance(value, (int, float)):
+                continue
+            if isinstance(value, float) and (value != value or abs(value) == float("inf")):
+                continue
+            out[name] = value
+
+    add("", raw or {})
+    for nested in ("stats", "performance", "timings", "metrics"):
+        value = (raw or {}).get(nested)
+        if isinstance(value, dict):
+            add(nested + ".", value)
+    return dict(list(out.items())[:80])
+
+
+def _first_positive_metric(metrics: dict[str, float | int], names: tuple[str, ...]) -> float | None:
+    lowered = {str(k).lower(): v for k, v in metrics.items()}
+    for wanted in names:
+        for key, value in lowered.items():
+            if key == wanted or key.endswith("." + wanted):
+                try:
+                    number = float(value)
+                except Exception:
+                    continue
+                if number > 0:
+                    return number
+    return None
+
+
+def _qwen_perf_sample_from_state(
+    raw: dict[str, Any],
+    observed_at: float,
+    previous: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    metrics = _runner_numeric_metrics(raw or {})
+    generation = str((raw or {}).get("generation") or "")[:40]
+    cycle = int((raw or {}).get("cycles", 0) or 0)
+    prompt_tokens = int((raw or {}).get("last_prompt_tokens", 0) or 0)
+    completion_tokens = int((raw or {}).get("last_completion_tokens", 0) or 0)
+
+    native_tps = _first_positive_metric(metrics, (
+        "completion_tokens_per_second",
+        "output_tokens_per_second",
+        "generation_tokens_per_second",
+        "eval_tokens_per_second",
+        "tokens_per_second",
+        "tok_per_sec",
+        "tokens_per_sec",
+        "tps",
+    ))
+    generation_seconds = _first_positive_metric(metrics, (
+        "generation_seconds",
+        "generation_duration_seconds",
+        "last_generation_seconds",
+        "completion_seconds",
+        "eval_seconds",
+        "generation_time_seconds",
+    ))
+    if native_tps is None and generation_seconds and completion_tokens > 0:
+        native_tps = completion_tokens / generation_seconds
+
+    sample: dict[str, Any] = {
+        "observed_at": observed_at,
+        "generation": generation,
+        "cycle": cycle,
+        "model": _public_safe_string((raw or {}).get("model"), 160),
+        "engine": _public_safe_string((raw or {}).get("engine"), 100),
+        "runner_version": _public_safe_string((raw or {}).get("runner_version"), 80),
+        "context_length": int((raw or {}).get("context_length", 0) or 0),
+        "prompt_tokens": prompt_tokens,
+        "completion_tokens": completion_tokens,
+        "native_generation_seconds": round(generation_seconds, 4) if generation_seconds else None,
+        "native_completion_tokens_per_second": round(native_tps, 4) if native_tps else None,
+        "runner_numeric_metrics": metrics,
+        "observed_cycle_wall_seconds": None,
+        "observed_completion_tokens_per_second": None,
+        "observed_rate_includes_tool_and_runner_overhead": True,
+    }
+
+    if isinstance(previous, dict):
+        same_generation = str(previous.get("generation") or "") == generation
+        prior_cycle = int(previous.get("cycle", 0) or 0)
+        prior_at = float(previous.get("observed_at", 0.0) or 0.0)
+        if same_generation and cycle == prior_cycle + 1 and observed_at > prior_at:
+            elapsed = observed_at - prior_at
+            sample["observed_cycle_wall_seconds"] = round(elapsed, 4)
+            if completion_tokens > 0:
+                sample["observed_completion_tokens_per_second"] = round(completion_tokens / elapsed, 4)
+    return sample
+
+
+_qwen_perf_lock = threading.Lock()
+_qwen_perf_sampler_started = False
+_qwen_perf_last_fingerprint = ""
+
+
+def _qwen_perf_sampler_once() -> None:
+    global _qwen_perf_last_fingerprint
+    install_dir = LOCALAPPDATA / "QwenRobloxAgent"
+    raw = _read_json_file_safe(install_dir / "autopilot_supervisor_state.json")
+    generation = str(raw.get("generation") or "")
+    cycle = int(raw.get("cycles", 0) or 0)
+    if not generation or cycle <= 0:
+        return
+    fingerprint = "|".join([
+        generation,
+        str(cycle),
+        str(raw.get("last_prompt_tokens", "")),
+        str(raw.get("last_completion_tokens", "")),
+        str(raw.get("generated_at", raw.get("updated_at", ""))),
+    ])
+
+    with _qwen_perf_lock:
+        last_rows = _tail_jsonl_safe(TELEMETRY_QWEN_PERFORMANCE_FILE, 1)
+        previous = last_rows[-1] if last_rows else None
+        if fingerprint == _qwen_perf_last_fingerprint:
+            return
+        if isinstance(previous, dict) and previous.get("fingerprint") == fingerprint:
+            _qwen_perf_last_fingerprint = fingerprint
+            return
+        sample = _qwen_perf_sample_from_state(raw, time.time(), previous)
+        sample["fingerprint"] = fingerprint
+        _append_jsonl(TELEMETRY_QWEN_PERFORMANCE_FILE, sample)
+        _qwen_perf_last_fingerprint = fingerprint
+
+
+def _qwen_perf_sampler_loop() -> None:
+    while True:
+        try:
+            _qwen_perf_sampler_once()
+        except Exception as exc:
+            log(f"qwen performance sampler failed: {exc!r}")
+        time.sleep(QWEN_PERF_SAMPLER_INTERVAL)
+
+
+def _start_qwen_perf_sampler_thread() -> None:
+    global _qwen_perf_sampler_started
+    if _qwen_perf_sampler_started:
+        return
+    _qwen_perf_sampler_started = True
+    threading.Thread(
+        target=_qwen_perf_sampler_loop,
+        daemon=True,
+        name="qwen-performance-sampler",
+    ).start()
+
+
+def _rate_summary(values: list[float]) -> dict[str, Any]:
+    clean = [float(x) for x in values if isinstance(x, (int, float)) and float(x) > 0]
+    if not clean:
+        return {"count": 0, "average": None, "min": None, "max": None}
+    return {
+        "count": len(clean),
+        "average": round(sum(clean) / len(clean), 4),
+        "min": round(min(clean), 4),
+        "max": round(max(clean), 4),
+    }
+
+
+def _qwen_performance_summary(
+    raw: dict[str, Any],
+    history: list[dict[str, Any]],
+    model_updater: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    rows = [x for x in history if isinstance(x, dict)][-QWEN_PERF_HISTORY_TAIL:]
+    native_rates = [
+        float(x.get("native_completion_tokens_per_second"))
+        for x in rows
+        if isinstance(x.get("native_completion_tokens_per_second"), (int, float))
+    ]
+    observed_rates = [
+        float(x.get("observed_completion_tokens_per_second"))
+        for x in rows
+        if isinstance(x.get("observed_completion_tokens_per_second"), (int, float))
+    ]
+    cycle_seconds = [
+        float(x.get("observed_cycle_wall_seconds"))
+        for x in rows
+        if isinstance(x.get("observed_cycle_wall_seconds"), (int, float))
+    ]
+    prompt_values = [
+        int(x.get("prompt_tokens", 0) or 0)
+        for x in rows
+        if int(x.get("prompt_tokens", 0) or 0) > 0
+    ]
+    completion_values = [
+        int(x.get("completion_tokens", 0) or 0)
+        for x in rows
+        if int(x.get("completion_tokens", 0) or 0) > 0
+    ]
+
+    current = _qwen_perf_sample_from_state(raw or {}, time.time(), rows[-1] if rows else None)
+    current.pop("observed_at", None)
+    current.pop("fingerprint", None)
+    gpu = (model_updater or {}).get("gpu")
+    return {
+        "current": current,
+        "gpu_offload": _public_safe_string(gpu, 40) if gpu is not None else "",
+        "rolling": {
+            "native_completion_tokens_per_second": _rate_summary(native_rates[-10:]),
+            "observed_completion_tokens_per_second": _rate_summary(observed_rates[-10:]),
+            "observed_cycle_wall_seconds": _rate_summary(cycle_seconds[-10:]),
+            "average_prompt_tokens_last_10": (
+                round(sum(prompt_values[-10:]) / len(prompt_values[-10:]), 2) if prompt_values[-10:] else None
+            ),
+            "average_completion_tokens_last_10": (
+                round(sum(completion_values[-10:]) / len(completion_values[-10:]), 2)
+                if completion_values[-10:] else None
+            ),
+        },
+        "recent_samples": rows[-12:],
+        "measurement_notes": {
+            "native_rate": "Preferred when runner/LM Studio exposes a real generation timing or tok/s metric.",
+            "observed_rate": (
+                "Fallback estimate from successive runner cycle completions sampled locally every "
+                f"{QWEN_PERF_SAMPLER_INTERVAL:g}s; includes tool calls and runner overhead, so it is not pure decode tok/s."
+            ),
+            "privacy": "Only numeric performance/config metadata is published; prompts, completions, Roblox source, and secrets are excluded.",
+        },
+    }
+
+
 def _public_autopilot_state(raw: dict[str, Any]) -> dict[str, Any]:
     keys = (
-        "status", "generation", "attempts", "runner_pid", "model",
+        "generated_at", "updated_at", "status", "generation", "attempts", "runner_pid", "model",
         "context_length", "rollover_at", "controller_state_clear", "engine",
         "runner_version", "last_error", "rollovers", "cycles",
         "last_prompt_tokens", "last_completion_tokens", "restart_reason",
@@ -1104,6 +1344,7 @@ def _public_autopilot_state(raw: dict[str, Any]) -> dict[str, Any]:
             else:
                 value = _public_safe_string(value, 700)
         out[key] = value
+    out["runner_numeric_metrics"] = _runner_numeric_metrics(raw or {})
     return out
 
 
@@ -1348,6 +1589,7 @@ def _diagnostic_snapshot() -> dict[str, Any]:
     model_updater = _read_json_file_safe(install_dir / "model_auto_updater_state.json")
     action_rows = _tail_jsonl_safe(TELEMETRY_ACTION_HISTORY_FILE, GITHUB_HEARTBEAT_ACTION_TAIL)
     failure_rows = _tail_jsonl_safe(TELEMETRY_FAILURE_HISTORY_FILE, GITHUB_HEARTBEAT_FAILURE_TAIL)
+    qwen_perf_rows = _tail_jsonl_safe(TELEMETRY_QWEN_PERFORMANCE_FILE, QWEN_PERF_HISTORY_TAIL)
 
     with _state_lock:
         state = copy.deepcopy(STATE)
@@ -1398,6 +1640,7 @@ def _diagnostic_snapshot() -> dict[str, Any]:
         },
         "manager": _public_full_auto_health(full_auto),
         "autopilot": _public_autopilot_state(autopilot),
+        "qwen_performance": _qwen_performance_summary(autopilot, qwen_perf_rows, model_updater),
         "model_updater": _public_model_updater_state(model_updater),
         "remote_task_dispatch": {
             "status": _public_safe_string(full_auto.get("remote_task_dispatch_status") or full_auto.get("remote_task_status"), 80),
@@ -5470,8 +5713,10 @@ def autopilot_main(argv: list[str] | None = None) -> int:
         if previous_response_id:
             body["previous_response_id"] = previous_response_id
 
+        request_started = time.perf_counter()
         try:
             response = _lmstudio_http_json(url, body, ns.api_token)
+            request_seconds = max(0.000001, time.perf_counter() - request_started)
         except KeyboardInterrupt:
             telemetry_record_autopilot("autopilot_stopped", run_id=run_id, cycle=cycles, reason="keyboard_interrupt")
             print("\n[AUTOPILOT] stopped by user.")
@@ -5495,6 +5740,13 @@ def autopilot_main(argv: list[str] | None = None) -> int:
         input_tokens = int(stats.get("input_tokens", 0) or 0)
         output_tokens = int(stats.get("total_output_tokens", 0) or 0)
         reasoning_tokens = int(stats.get("reasoning_output_tokens", 0) or 0)
+        stat_metrics = _runner_numeric_metrics(stats)
+        native_tps = _first_positive_metric(stat_metrics, (
+            "completion_tokens_per_second", "output_tokens_per_second",
+            "generation_tokens_per_second", "eval_tokens_per_second",
+            "tokens_per_second", "tokens_per_sec", "tok_per_sec", "tps",
+        ))
+        request_completion_tps = (output_tokens / request_seconds) if output_tokens > 0 else 0.0
         rid = response.get("response_id")
         if isinstance(rid, str) and rid.startswith("resp_"):
             previous_response_id = rid
@@ -5513,6 +5765,10 @@ def autopilot_main(argv: list[str] | None = None) -> int:
             output_tokens=output_tokens,
             reasoning_tokens=reasoning_tokens,
             rollovers=rollovers,
+            request_seconds=round(request_seconds, 4),
+            request_completion_tokens_per_second=round(request_completion_tps, 4),
+            native_completion_tokens_per_second=round(native_tps, 4) if native_tps else None,
+            lmstudio_numeric_stats=stat_metrics,
             messages=[clip(m, 6000) for m in messages[-4:]],
         )
 
@@ -5644,6 +5900,40 @@ def self_test_main() -> int:
         failures.append(f"telemetry token metrics were incorrectly redacted: {sanitized_meter}")
     if sanitized_meter.get("access_token") != "[REDACTED]":
         failures.append("sensitive access_token was not redacted")
+
+    # V6.3.19 regression: performance telemetry contains only safe numeric/model
+    # metadata and computes both native and observed completion throughput.
+    perf_prev = {
+        "observed_at": 100.0,
+        "generation": "g1",
+        "cycle": 4,
+        "prompt_tokens": 10000,
+        "completion_tokens": 400,
+    }
+    perf_raw = {
+        "generation": "g1",
+        "cycles": 5,
+        "model": "qwen/qwen3.5-9b",
+        "engine": "direct_mcp_tools_v1",
+        "runner_version": "3.2.0",
+        "context_length": 60000,
+        "last_prompt_tokens": 12000,
+        "last_completion_tokens": 500,
+        "generation_seconds": 10.0,
+        "prompt": "MUST_NOT_LEAK",
+        "secret": "MUST_NOT_LEAK",
+    }
+    perf_sample = _qwen_perf_sample_from_state(perf_raw, 110.0, perf_prev)
+    if perf_sample.get("native_completion_tokens_per_second") != 50.0:
+        failures.append(f"V6.3.19 native tok/s calculation wrong: {perf_sample!r}")
+    if perf_sample.get("observed_completion_tokens_per_second") != 50.0:
+        failures.append(f"V6.3.19 observed tok/s calculation wrong: {perf_sample!r}")
+    perf_json = json.dumps(perf_sample, ensure_ascii=False)
+    if "MUST_NOT_LEAK" in perf_json or "prompt" in perf_sample:
+        failures.append(f"V6.3.19 performance telemetry leaked non-numeric runner content: {perf_json}")
+    perf_summary = _qwen_performance_summary(perf_raw, [perf_sample], {"gpu": "0.59375"})
+    if perf_summary.get("gpu_offload") != "0.59375":
+        failures.append(f"V6.3.19 GPU offload missing from performance summary: {perf_summary!r}")
 
     # V6.2 regression: repaired source blocker + need_playtest is a controller conflict.
     conflict_state = new_state()
@@ -6237,6 +6527,7 @@ def main() -> int:
     refresh_telemetry_files()
     threading.Thread(target=child_stdout_loop, args=(child,), daemon=True).start()
     threading.Thread(target=child_stderr_loop, args=(child,), daemon=True).start()
+    _start_qwen_perf_sampler_thread()
     _start_github_heartbeat_thread()
     _start_model_auto_updater_bootstrap()
 
