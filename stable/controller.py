@@ -39,8 +39,8 @@ import urllib.request
 from pathlib import Path
 from typing import Any
 
-APP_NAME = "Qwen Roblox Enforced Proxy V6.3.1"
-VERSION = "6.3.1"
+APP_NAME = "Qwen Roblox Enforced Proxy V6.3.2"
+VERSION = "6.3.2"
 
 LOCALAPPDATA = Path(os.environ.get("LOCALAPPDATA", str(Path.home())))
 STATE_DIR = LOCALAPPDATA / "QwenRobloxEnforcedProxy"
@@ -2685,6 +2685,23 @@ def target_matches(needed: str, actual: str) -> bool:
     b = norm(actual).replace("game.", "")
     return a == b or a.endswith(b) or b.endswith(a) or a.split(".")[-1] == b.split(".")[-1]
 
+def repaired_static_blocker_is_stale(blocker: Any, gate: Any) -> bool:
+    """A repair_applied static blocker must not veto post-repair verification.
+
+    Persisted controller state can legitimately contain the old blocker across a
+    controller/agent restart even after the authoritative reread advanced the
+    verification gate. Once the gate is in the verification pipeline for the
+    same target, the gate is authoritative and the stale blocker is ignored.
+    """
+    return (
+        isinstance(gate, dict)
+        and gate.get("stage") in {"need_playtest", "need_output", "need_runtime_verify", "need_visual"}
+        and isinstance(blocker, dict)
+        and blocker.get("classification") == "static_source_defect"
+        and blocker.get("stage") == "repair_applied"
+        and target_matches(blocker.get("path") or "", gate.get("target") or "")
+    )
+
 
 def _call_sig_short(name: str, args: dict[str, Any] | None) -> str:
     raw = json.dumps({"name": name, "args": args or {}}, ensure_ascii=True, sort_keys=True)
@@ -2772,15 +2789,11 @@ def block_reason_for_call(name: str, args: dict[str, Any] | None) -> str | None:
     gate = state.get("gate")
     mode = state.get("studio_mode")
 
-    # V6.1 defensive reconciliation for persisted V6 states: a repaired static
-    # blocker must not veto the exact Play action required by a clean gate.
-    if (
-        isinstance(gate, dict) and gate.get("stage") == "need_playtest"
-        and isinstance(blocker, dict)
-        and blocker.get("classification") == "static_source_defect"
-        and blocker.get("stage") == "repair_applied"
-        and target_matches(blocker.get("path") or "", gate.get("target") or "")
-    ):
+    # V6.3.2 defensive reconciliation for persisted state: once a repaired
+    # static-source blocker has handed control to the post-repair verification
+    # gate, it must not veto Play, Output, runtime evidence, or visual checks.
+    # This is especially important across controller/autopilot restarts.
+    if repaired_static_blocker_is_stale(blocker, gate):
         blocker = None
 
     repair_override = False
@@ -3350,6 +3363,12 @@ def on_tool_result(name: str, args: dict[str, Any] | None, response: dict[str, A
             gate = state.get("gate")
             if isinstance(gate, dict) and gate.get("stage") == "need_playtest":
                 gate["stage"] = "need_output"
+                # The successful required Play transition proves the repaired
+                # source has entered runtime verification. Retire any matching
+                # persisted repair_applied blocker so Output cannot be deadlocked.
+                blocker = state.get("current_blocker")
+                if repaired_static_blocker_is_stale(blocker, gate):
+                    state["current_blocker"] = None
         state_update(after_play)
         with _state_lock:
             gate = STATE.get("gate")
@@ -4167,6 +4186,33 @@ def self_test_main() -> int:
     packet = _compact_failure_packet("controller_state_conflict", "gate/blocker conflict", "start_stop_play", {"is_start": True}, conflict_state)
     if packet.get("classification") != "controller_bug" or not packet.get("regression_id"):
         failures.append(f"compact failure packet invalid: {packet}")
+
+    # V6.3.2 regression: a persisted repair_applied static blocker must not
+    # deadlock the post-repair verification pipeline after Play starts.
+    persisted = new_state()
+    persisted["studio_mode"] = "play"
+    persisted["gate"] = {"stage": "need_output", "target": "game.ServerScriptService.Test"}
+    persisted["current_blocker"] = {
+        "classification": "static_source_defect",
+        "stage": "repair_applied",
+        "path": "game.ServerScriptService.Test",
+        "message": "stale repaired defect",
+    }
+    if not repaired_static_blocker_is_stale(persisted["current_blocker"], persisted["gate"]):
+        failures.append("V6.3.2 stale repaired blocker was not recognized during need_output")
+
+    with _state_lock:
+        saved_state = copy.deepcopy(STATE)
+        STATE.clear()
+        STATE.update(copy.deepcopy(persisted))
+    try:
+        reason = block_reason_for_call("get_console_output", {})
+        if reason:
+            failures.append(f"V6.3.2 get_console_output was blocked by stale repaired blocker: {reason}")
+    finally:
+        with _state_lock:
+            STATE.clear()
+            STATE.update(saved_state)
 
     # V6.3 regression: controller-bug packets are eligible for automatic
     # GitHub handoff, while non-controller failures are not.
