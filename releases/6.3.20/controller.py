@@ -6452,15 +6452,22 @@ def self_test_main() -> int:
         STATE.clear()
         STATE.update(copy.deepcopy(benchmark_missing_state))
     try:
-        allowed_reason = block_reason_for_call("create_instances", correct_bootstrap_create)
+        allowed_reason = block_reason_for_call(
+            "multi_edit",
+            {
+                "file_path": missing_target,
+                "edits": [{"old_string": "", "new_string": SCRIPT_BOOTSTRAP_SOURCE, "replace_all": False}],
+                "datamodel_type": "Edit",
+            },
+        )
         if allowed_reason:
-            failures.append(f"V6.3.18 exact bootstrap creation was blocked: {allowed_reason!r}")
+            failures.append(f"V6.3.18/20 exact bootstrap creation transaction was blocked: {allowed_reason!r}")
         bad_edit_reason = block_reason_for_call(
             "multi_edit",
             {"file_path": missing_target, "edits": [{"old_string": "", "new_string": "print(1)"}]},
         )
-        if not bad_edit_reason or "create_instances" not in bad_edit_reason:
-            failures.append(f"V6.3.18 nonexistent benchmark multi_edit lacked create guidance: {bad_edit_reason!r}")
+        if not bad_edit_reason or "old_string=''" not in bad_edit_reason:
+            failures.append(f"V6.3.18/20 nonexistent benchmark multi_edit lacked safe bootstrap guidance: {bad_edit_reason!r}")
     finally:
         with _state_lock:
             STATE.clear()
