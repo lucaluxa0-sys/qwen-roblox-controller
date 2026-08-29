@@ -39,8 +39,8 @@ import urllib.request
 from pathlib import Path
 from typing import Any
 
-APP_NAME = "Qwen Roblox Enforced Proxy V6.3.5"
-VERSION = "6.3.5"
+APP_NAME = "Qwen Roblox Enforced Proxy V6.3.6"
+VERSION = "6.3.6"
 
 LOCALAPPDATA = Path(os.environ.get("LOCALAPPDATA", str(Path.home())))
 STATE_DIR = LOCALAPPDATA / "QwenRobloxEnforcedProxy"
@@ -67,6 +67,8 @@ TELEMETRY_AUTOPILOT_FILE = TELEMETRY_DIR / "autopilot_runs.jsonl"
 TELEMETRY_FAILURE_PACKET_FILE = TELEMETRY_DIR / "failure_packet.json"
 TELEMETRY_REGRESSION_CASES_FILE = TELEMETRY_DIR / "regression_cases.jsonl"
 TELEMETRY_GITHUB_REPORTER_FILE = TELEMETRY_DIR / "github_reporter_status.json"
+TELEMETRY_GITHUB_HEARTBEAT_FILE = TELEMETRY_DIR / "github_heartbeat_status.json"
+TELEMETRY_DIAGNOSTIC_SNAPSHOT_FILE = TELEMETRY_DIR / "diagnostic_snapshot.json"
 TELEMETRY_SCHEMA_VERSION = 1
 
 # Optional automatic GitHub failure handoff. No token is embedded in the
@@ -79,6 +81,22 @@ GITHUB_FAILURE_REPO = os.environ.get(
 ).strip()
 GITHUB_FAILURE_LABEL = os.environ.get("QWEN_GITHUB_FAILURE_LABEL", "controller-failure").strip()
 GITHUB_FAILURE_TIMEOUT = int(os.environ.get("QWEN_GITHUB_FAILURE_TIMEOUT", "20"))
+
+# Public-safe diagnostic heartbeat. This intentionally uploads only a strict,
+# bounded allowlist to the existing GitHub repository. Raw Roblox source,
+# arbitrary prompts/completions, auth material, and hidden model reasoning are
+# never uploaded by this channel because the repository may be public.
+GITHUB_HEARTBEAT_ENABLED = os.environ.get("QWEN_GITHUB_HEARTBEAT_ENABLED", "1") != "0"
+GITHUB_HEARTBEAT_INTERVAL = max(60, int(os.environ.get("QWEN_GITHUB_HEARTBEAT_INTERVAL", "120")))
+GITHUB_HEARTBEAT_TITLE = os.environ.get(
+    "QWEN_GITHUB_HEARTBEAT_TITLE",
+    "[AUTO-HEARTBEAT] Qwen Roblox Agent",
+).strip()
+GITHUB_HEARTBEAT_ACTION_TAIL = max(10, min(100, int(os.environ.get("QWEN_GITHUB_HEARTBEAT_ACTION_TAIL", "60"))))
+GITHUB_HEARTBEAT_FAILURE_TAIL = max(3, min(30, int(os.environ.get("QWEN_GITHUB_HEARTBEAT_FAILURE_TAIL", "10"))))
+GITHUB_HEARTBEAT_LOG_TAIL = max(10, min(120, int(os.environ.get("QWEN_GITHUB_HEARTBEAT_LOG_TAIL", "60"))))
+GITHUB_HEARTBEAT_MAX_BODY = max(12000, min(60000, int(os.environ.get("QWEN_GITHUB_HEARTBEAT_MAX_BODY", "48000"))))
+
 DEADLOCK_BLOCK_WINDOW = int(os.environ.get("QWEN_DEADLOCK_BLOCK_WINDOW", "8"))
 DEADLOCK_REPEAT_LIMIT = int(os.environ.get("QWEN_DEADLOCK_REPEAT_LIMIT", "3"))
 MCP_PROXY_OUTDATED_MARKER = "client proxy is out of date, restart to update"
@@ -596,6 +614,8 @@ def telemetry_status_payload(state: dict[str, Any] | None = None) -> dict[str, A
             "failure_packet": str(TELEMETRY_FAILURE_PACKET_FILE),
             "regression_cases": str(TELEMETRY_REGRESSION_CASES_FILE),
             "github_reporter_status": str(TELEMETRY_GITHUB_REPORTER_FILE),
+            "github_heartbeat_status": str(TELEMETRY_GITHUB_HEARTBEAT_FILE),
+            "diagnostic_snapshot": str(TELEMETRY_DIAGNOSTIC_SNAPSHOT_FILE),
         },
     }
 
@@ -761,6 +781,426 @@ def _github_reporter_status(status: str, **fields: Any) -> None:
         _atomic_write_json(TELEMETRY_GITHUB_REPORTER_FILE, payload)
     except Exception as exc:
         log(f"github reporter status write failed: {exc!r}")
+
+
+
+_github_heartbeat_lock = threading.Lock()
+_github_heartbeat_started = False
+
+_PUBLIC_PATH_RE = re.compile(r"(?i)\b[A-Z]:\\Users\\[^\\\s]+")
+_PUBLIC_SECRET_IN_TEXT_RE = re.compile(
+    r"(?i)\b(?:bearer\s+[A-Za-z0-9._~+/\-=]{12,}|"
+    r"(?:api[_-]?key|access[_-]?token|refresh[_-]?token|password|passwd|secret)\s*[:=]\s*[^\s,;]+)"
+)
+_PUBLIC_LONG_TOKEN_RE = re.compile(r"\b[A-Za-z0-9+/_=-]{64,}\b")
+_PUBLIC_LOG_ALLOW_RE = re.compile(
+    r"(?i)(?:"
+    r"\[AUTOPILOT\]|MCP READY|HEADLESS (?:SESSION|ROLLOVER) PROMPT SENT|"
+    r"TASK_COMPLETE|cycle=|rollover|generation|restart|controller|manager|"
+    r"model|tool error|result_error|mcp|warn|error|fail|connected|disconnected"
+    r")"
+)
+
+
+def _public_safe_string(value: Any, limit: int = 1000) -> str:
+    text = str(value or "")
+    text = _PUBLIC_PATH_RE.sub("%USERPROFILE%", text)
+    text = _PUBLIC_SECRET_IN_TEXT_RE.sub("[REDACTED_SECRET]", text)
+    text = _PUBLIC_LONG_TOKEN_RE.sub("[REDACTED_LONG_TOKEN]", text)
+    lowered = text.lower()
+    if any(marker in lowered for marker in (
+        "script.source =", "source = [[", "source = \"", "source = '",
+        "authorization:", "cookie:", "set-cookie:",
+    )):
+        return "[REDACTED_SOURCE_OR_SECRET]"
+    text = text.replace("\x00", "")
+    if len(text) > limit:
+        text = text[:limit] + f"...[clipped {len(text)-limit} chars]"
+    return text
+
+
+def _read_json_file_safe(path: Path) -> dict[str, Any]:
+    try:
+        if not path.exists():
+            return {}
+        parsed = json.loads(path.read_text(encoding="utf-8", errors="replace"))
+        return parsed if isinstance(parsed, dict) else {}
+    except Exception:
+        return {}
+
+
+def _tail_jsonl_safe(path: Path, limit: int) -> list[dict[str, Any]]:
+    try:
+        if not path.exists():
+            return []
+        lines = path.read_text(encoding="utf-8", errors="replace").splitlines()[-max(1, limit):]
+    except Exception:
+        return []
+    rows: list[dict[str, Any]] = []
+    for line in lines:
+        try:
+            obj = json.loads(line)
+        except Exception:
+            continue
+        if isinstance(obj, dict):
+            rows.append(obj)
+    return rows
+
+
+def _public_action_row(row: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "at": row.get("at"),
+        "kind": _public_safe_string(row.get("kind"), 80),
+        "name": _public_safe_string(row.get("name"), 120),
+        "target": _public_safe_string(row.get("target"), 300),
+        "sig": _public_safe_string(row.get("sig"), 40),
+        "mutation_epoch": row.get("mutation_epoch"),
+        "play_session": row.get("play_session"),
+        "note": _public_safe_string(row.get("note"), 500),
+    }
+
+
+def _public_failure_row(row: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "at": row.get("at"),
+        "severity": _public_safe_string(row.get("severity"), 40),
+        "kind": _public_safe_string(row.get("kind"), 120),
+        "message": _public_safe_string(row.get("message"), 700),
+        "tool_name": _public_safe_string(row.get("tool_name"), 120),
+        "studio_mode": _public_safe_string(row.get("studio_mode"), 40),
+        "play_session": row.get("play_session"),
+        "mutation_epoch": row.get("mutation_epoch"),
+        "next_required_action": _public_safe_string(row.get("next_required_action"), 700),
+    }
+
+
+def _safe_autopilot_log_tail() -> list[str]:
+    install_dir = LOCALAPPDATA / "QwenRobloxAgent"
+    candidates = [
+        install_dir / "autopilot.log",
+        install_dir / "full_auto.log",
+        install_dir / "manager.log",
+    ]
+    source: Path | None = next((p for p in candidates if p.exists()), None)
+    if source is None:
+        return []
+    try:
+        lines = source.read_text(encoding="utf-8", errors="replace").splitlines()
+    except Exception:
+        return []
+    out: list[str] = []
+    for line in lines[-max(200, GITHUB_HEARTBEAT_LOG_TAIL * 5):]:
+        if not _PUBLIC_LOG_ALLOW_RE.search(line):
+            continue
+        safe = _public_safe_string(line, 700)
+        if re.search(r"(?i)HEADLESS (?:SESSION|ROLLOVER) PROMPT SENT", safe):
+            m = re.search(r"(?i)^(.*?HEADLESS (?:SESSION|ROLLOVER) PROMPT SENT)", safe)
+            safe = (m.group(1) if m else "HEADLESS PROMPT SENT") + " [content intentionally omitted]"
+        out.append(safe)
+    return out[-GITHUB_HEARTBEAT_LOG_TAIL:]
+
+
+def _public_full_auto_health(raw: dict[str, Any]) -> dict[str, Any]:
+    keys = (
+        "generated_at", "manager_version", "manager_pid", "last_loop_at",
+        "last_update_check_at", "last_update_result", "lmstudio_running",
+        "server_running", "server_port", "model_loaded", "resolved_model_key",
+        "model_load_source", "model_boot_proven", "telemetry_running",
+        "cloudflare_running", "github_cli", "autopilot_running",
+        "autopilot_status", "autopilot_generation", "autopilot_engine",
+        "autopilot_last_error", "rollover_at", "remote_task_status",
+        "remote_task_last_check_at", "pending_reload", "last_error",
+        "controller_disk_version", "controller_live_version",
+        "controller_live_pid", "controller_live_matches_disk",
+    )
+    out: dict[str, Any] = {}
+    for key in keys:
+        if key not in raw:
+            continue
+        value = raw.get(key)
+        if isinstance(value, str):
+            if key == "autopilot_generation":
+                value = value[:20]
+            else:
+                value = _public_safe_string(value, 700)
+        out[key] = value
+    return out
+
+
+def _public_autopilot_state(raw: dict[str, Any]) -> dict[str, Any]:
+    keys = (
+        "status", "generation", "attempts", "runner_pid", "model",
+        "context_length", "rollover_at", "controller_state_clear", "engine",
+        "runner_version", "last_error", "rollovers", "cycles",
+        "last_prompt_tokens", "last_completion_tokens", "restart_reason",
+        "include_task",
+    )
+    out: dict[str, Any] = {}
+    for key in keys:
+        if key not in raw:
+            continue
+        value = raw.get(key)
+        if isinstance(value, str):
+            if key == "generation":
+                value = value[:20]
+            else:
+                value = _public_safe_string(value, 700)
+        out[key] = value
+    return out
+
+
+def _public_blocker(blocker: Any) -> Any:
+    if not isinstance(blocker, dict):
+        return None
+    return {
+        "classification": _public_safe_string(blocker.get("classification"), 80),
+        "path": _public_safe_string(blocker.get("path"), 300),
+        "line": blocker.get("line"),
+        "stage": _public_safe_string(blocker.get("stage"), 80),
+        "message": _public_safe_string(blocker.get("message"), 700),
+    }
+
+
+def _public_gate(gate: Any) -> Any:
+    if not isinstance(gate, dict):
+        return None
+    return {
+        "stage": _public_safe_string(gate.get("stage"), 80),
+        "target": _public_safe_string(gate.get("target"), 300),
+        "visual": bool(gate.get("visual", False)),
+        "runtime_requirements": _telemetry_sanitize(gate.get("runtime_requirements") or {}),
+    }
+
+
+def _diagnostic_snapshot() -> dict[str, Any]:
+    install_dir = LOCALAPPDATA / "QwenRobloxAgent"
+    full_auto = _read_json_file_safe(install_dir / "full_auto_health.json")
+    autopilot = _read_json_file_safe(install_dir / "autopilot_supervisor_state.json")
+    action_rows = _tail_jsonl_safe(TELEMETRY_ACTION_HISTORY_FILE, GITHUB_HEARTBEAT_ACTION_TAIL)
+    failure_rows = _tail_jsonl_safe(TELEMETRY_FAILURE_HISTORY_FILE, GITHUB_HEARTBEAT_FAILURE_TAIL)
+
+    with _state_lock:
+        state = copy.deepcopy(STATE)
+    with _health_lock:
+        health = copy.deepcopy(_CONTROLLER_HEALTH)
+
+    snapshot = {
+        "schema_version": 1,
+        "generated_at": time.time(),
+        "controller": {
+            "version": VERSION,
+            "pid": os.getpid(),
+            "studio_mode": state.get("studio_mode"),
+            "play_session": state.get("play_session"),
+            "mutation_epoch": state.get("mutation_epoch"),
+            "current_blocker": _public_blocker(state.get("current_blocker")),
+            "gate": _public_gate(state.get("gate")),
+            "next_required_action": _public_safe_string(next_required_action_from_state(state), 900),
+            "blocked_count": state.get("blocked_count", 0),
+            "forwarded_count": state.get("forwarded_count", 0),
+            "tool_error_count": state.get("tool_error_count", 0),
+            "runtime_error_count": state.get("runtime_error_count", 0),
+            "mcp_recovery": _telemetry_sanitize(state.get("mcp_recovery") or {}),
+            "context_estimate": _telemetry_sanitize(state.get("context_estimate") or {}),
+        },
+        "controller_health": {
+            "controller_running": health.get("controller_running"),
+            "roblox_child_pid": health.get("roblox_child_pid"),
+            "roblox_child_running": health.get("roblox_child_running"),
+            "roblox_child_returncode": health.get("roblox_child_returncode"),
+            "last_roblox_stderr": _public_safe_string(health.get("last_roblox_stderr"), 1000),
+            "last_exception": _public_safe_string(health.get("last_exception"), 1000),
+            "last_health_update": health.get("last_health_update"),
+        },
+        "manager": _public_full_auto_health(full_auto),
+        "autopilot": _public_autopilot_state(autopilot),
+        "recent_actions": [_public_action_row(x) for x in action_rows],
+        "recent_failures": [_public_failure_row(x) for x in failure_rows],
+        "recent_autopilot_events": _safe_autopilot_log_tail(),
+        "qwen_visibility": {
+            "visible_outputs": (
+                "Only metadata/events already written to local logs are published here. "
+                "Raw prompts, raw completions, Roblox source, and arbitrary tool arguments are intentionally omitted "
+                "because the configured GitHub repository may be public."
+            ),
+            "hidden_reasoning": (
+                "Hidden model chain-of-thought is not available to the controller and is never claimed to be captured. "
+                "Reasoning token counts may be visible when the runner exposes them."
+            ),
+        },
+        "public_safety": "strict allowlist; no raw tool arguments/source/prompts/secrets",
+    }
+    return _telemetry_sanitize(snapshot)
+
+
+def _github_heartbeat_status(status: str, **fields: Any) -> None:
+    try:
+        payload = {
+            "schema_version": TELEMETRY_SCHEMA_VERSION,
+            "generated_at": time.time(),
+            "controller_version": VERSION,
+            "status": status,
+            "repo": GITHUB_FAILURE_REPO,
+            "heartbeat_title": GITHUB_HEARTBEAT_TITLE,
+            **fields,
+        }
+        _atomic_write_json(TELEMETRY_GITHUB_HEARTBEAT_FILE, payload)
+    except Exception as exc:
+        log(f"github heartbeat status write failed: {exc!r}")
+
+
+def _heartbeat_issue_body(snapshot: dict[str, Any]) -> str:
+    body_json = json.dumps(snapshot, ensure_ascii=False, indent=2, default=str)
+    body = (
+        "<!-- qwen-roblox-auto-heartbeat-v1 -->\n"
+        "# Qwen Roblox automatic diagnostic heartbeat\n\n"
+        "This issue is maintained automatically by the local controller. "
+        "It contains a bounded, public-safe diagnostic snapshot for remote go-check inspection.\n\n"
+        "**Privacy boundary:** raw Roblox source, arbitrary prompts/completions, tool arguments, secrets, "
+        "and hidden model reasoning are intentionally not uploaded.\n\n"
+        "## Latest snapshot\n\n"
+        "~~~json\n"
+        + body_json
+        + "\n~~~\n"
+    )
+    if len(body) > GITHUB_HEARTBEAT_MAX_BODY:
+        smaller = copy.deepcopy(snapshot)
+        smaller["recent_actions"] = list(smaller.get("recent_actions") or [])[-20:]
+        smaller["recent_autopilot_events"] = list(smaller.get("recent_autopilot_events") or [])[-20:]
+        smaller["recent_failures"] = list(smaller.get("recent_failures") or [])[-5:]
+        body_json = json.dumps(smaller, ensure_ascii=False, indent=2, default=str)
+        body = (
+            "<!-- qwen-roblox-auto-heartbeat-v1 -->\n"
+            "# Qwen Roblox automatic diagnostic heartbeat\n\n"
+            "This issue is maintained automatically by the local controller. "
+            "Snapshot was compacted to remain within GitHub issue limits.\n\n"
+            "~~~json\n" + body_json + "\n~~~\n"
+        )
+    return body[:GITHUB_HEARTBEAT_MAX_BODY]
+
+
+def _publish_diagnostic_heartbeat_once() -> None:
+    if not GITHUB_HEARTBEAT_ENABLED or not GITHUB_FAILURE_REPO or not GITHUB_HEARTBEAT_TITLE:
+        return
+    snapshot = _diagnostic_snapshot()
+    try:
+        _atomic_write_json(TELEMETRY_DIAGNOSTIC_SNAPSHOT_FILE, snapshot)
+    except Exception:
+        pass
+
+    with _github_heartbeat_lock:
+        gh = _github_cli_path()
+        if not gh:
+            _github_heartbeat_status("gh_missing")
+            return
+        auth = _github_run([gh, "auth", "status"])
+        if auth.returncode != 0:
+            _github_heartbeat_status("gh_not_authenticated")
+            return
+
+        body_path = TELEMETRY_DIR / ".github_heartbeat.md"
+        try:
+            body_path.write_text(_heartbeat_issue_body(snapshot), encoding="utf-8")
+            listing = _github_run([
+                gh, "issue", "list",
+                "--repo", GITHUB_FAILURE_REPO,
+                "--state", "all",
+                "--search", f"{GITHUB_HEARTBEAT_TITLE} in:title",
+                "--json", "number,title,state,url",
+                "--limit", "20",
+            ])
+            issue_number = 0
+            issue_url = ""
+            issue_state = ""
+            if listing.returncode == 0:
+                try:
+                    rows = json.loads(listing.stdout or "[]")
+                except Exception:
+                    rows = []
+                if isinstance(rows, list):
+                    for row in rows:
+                        if str(row.get("title") or "").strip() == GITHUB_HEARTBEAT_TITLE:
+                            issue_number = int(row.get("number") or 0)
+                            issue_url = str(row.get("url") or "")
+                            issue_state = str(row.get("state") or "").lower()
+                            break
+
+            if issue_number <= 0:
+                created = _github_run([
+                    gh, "issue", "create",
+                    "--repo", GITHUB_FAILURE_REPO,
+                    "--title", GITHUB_HEARTBEAT_TITLE,
+                    "--body-file", str(body_path),
+                ])
+                if created.returncode != 0:
+                    _github_heartbeat_status(
+                        "create_failed",
+                        detail=_public_safe_string(created.stderr or created.stdout, 1000),
+                    )
+                    return
+                issue_url = (created.stdout or "").strip().splitlines()[-1] if (created.stdout or "").strip() else ""
+                m = re.search(r"/issues/(\d+)", issue_url)
+                issue_number = int(m.group(1)) if m else 0
+                issue_state = "open"
+
+            if issue_number > 0:
+                edited = _github_run([
+                    gh, "issue", "edit", str(issue_number),
+                    "--repo", GITHUB_FAILURE_REPO,
+                    "--body-file", str(body_path),
+                ])
+                if edited.returncode != 0:
+                    _github_heartbeat_status(
+                        "update_failed",
+                        issue_number=issue_number,
+                        issue_url=issue_url,
+                        detail=_public_safe_string(edited.stderr or edited.stdout, 1000),
+                    )
+                    return
+                if issue_state == "closed":
+                    reopened = _github_run([
+                        gh, "issue", "reopen", str(issue_number),
+                        "--repo", GITHUB_FAILURE_REPO,
+                    ])
+                    if reopened.returncode != 0:
+                        log("heartbeat issue could not be reopened: " + _public_safe_string(reopened.stderr, 500))
+
+            _github_heartbeat_status(
+                "published",
+                issue_number=issue_number,
+                issue_url=issue_url,
+                snapshot_generated_at=snapshot.get("generated_at"),
+                interval_seconds=GITHUB_HEARTBEAT_INTERVAL,
+            )
+        except Exception as exc:
+            _github_heartbeat_status("publish_failed", detail=_public_safe_string(exc, 1000))
+        finally:
+            try:
+                body_path.unlink(missing_ok=True)
+            except Exception:
+                pass
+
+
+def _github_heartbeat_loop() -> None:
+    time.sleep(8)
+    while True:
+        try:
+            _publish_diagnostic_heartbeat_once()
+        except Exception as exc:
+            log(f"github heartbeat loop error: {exc!r}")
+        time.sleep(GITHUB_HEARTBEAT_INTERVAL)
+
+
+def _start_github_heartbeat_thread() -> None:
+    global _github_heartbeat_started
+    if not GITHUB_HEARTBEAT_ENABLED or _github_heartbeat_started:
+        return
+    _github_heartbeat_started = True
+    threading.Thread(
+        target=_github_heartbeat_loop,
+        daemon=True,
+        name="qwen-github-diagnostic-heartbeat",
+    ).start()
 
 
 def _github_failure_issue_body(packet: dict[str, Any]) -> str:
@@ -3763,6 +4203,8 @@ def status_payload() -> dict[str, Any]:
         "telemetry_status_file": str(TELEMETRY_STATUS_FILE),
         "telemetry_latest_failure_file": str(TELEMETRY_FAILURE_FILE),
         "telemetry_test_results_file": str(TELEMETRY_TEST_RESULTS_FILE),
+        "github_heartbeat_status_file": str(TELEMETRY_GITHUB_HEARTBEAT_FILE),
+        "diagnostic_snapshot_file": str(TELEMETRY_DIAGNOSTIC_SNAPSHOT_FILE),
         "controller_health": controller_health_payload(),
         "important": (
             "Enforcement is automatic. The model does NOT need to call supervisor tools. "
@@ -4618,6 +5060,39 @@ def self_test_main() -> int:
             STATE.clear()
             STATE.update(saved_state_635)
 
+    # V6.3.6 regression: public diagnostic snapshots must preserve useful
+    # controller/manager/autopilot metadata without exposing raw tool arguments,
+    # Roblox source, Windows usernames, or obvious auth material.
+    safe_action = _public_action_row({
+        "at": 1.0,
+        "kind": "block",
+        "name": "execute_luau",
+        "target": r"C:\Users\Example\project\Script",
+        "sig": "abc",
+        "mutation_epoch": 1,
+        "play_session": 2,
+        "arguments": {"code": "script.Source = 'secret code'"},
+        "note": "Authorization: Bearer abcdefghijklmnopqrstuvwxyz0123456789",
+    })
+    safe_action_json = json.dumps(safe_action, ensure_ascii=False)
+    if "arguments" in safe_action:
+        failures.append("V6.3.6 public action row exposed tool arguments")
+    if "Example" in safe_action_json or "Bearer abcdef" in safe_action_json:
+        failures.append(f"V6.3.6 public action sanitizer leaked user/token data: {safe_action_json}")
+
+    test_snapshot = {
+        "generated_at": 1.0,
+        "recent_actions": [safe_action] * 120,
+        "recent_failures": [],
+        "recent_autopilot_events": ["[AUTOPILOT] cycle=1"] * 120,
+        "qwen_visibility": {"hidden_reasoning": "not captured"},
+    }
+    body = _heartbeat_issue_body(test_snapshot)
+    if len(body) > GITHUB_HEARTBEAT_MAX_BODY:
+        failures.append("V6.3.6 heartbeat issue body exceeded configured maximum")
+    if "qwen-roblox-auto-heartbeat-v1" not in body:
+        failures.append("V6.3.6 heartbeat marker missing")
+
     # V6.3 regression: controller-bug packets are eligible for automatic
     # GitHub handoff, while non-controller failures are not.
     report_packet = dict(packet)
@@ -4645,7 +5120,7 @@ def self_test_main() -> int:
             severity="critical",
             extra={"failures": failures},
         )
-        print("V6.2 SELF-TEST FAILED")
+        print(f"V{VERSION} SELF-TEST FAILED")
         for row in failures:
             print(" -", row)
         return 1
@@ -4656,7 +5131,7 @@ def self_test_main() -> int:
         "failure_count": 0,
         "failures": [],
     })
-    print("V6.2 SELF-TEST PASSED")
+    print(f"V{VERSION} SELF-TEST PASSED")
     print(" - missing end rejected")
     print(" - unclosed delimiters rejected")
     print(" - common non-Luau operators rejected")
@@ -4687,7 +5162,7 @@ def telemetry_smoke_test_main() -> int:
         for row in problems:
             print(" -", row)
         return 1
-    print("V6.2 TELEMETRY SMOKE TEST PASSED")
+    print(f"V{VERSION} TELEMETRY SMOKE TEST PASSED")
     print(f" - telemetry directory: {TELEMETRY_DIR}")
     print(f" - status: {TELEMETRY_STATUS_FILE.name}")
     print(f" - health: {TELEMETRY_HEALTH_FILE.name}")
@@ -4714,6 +5189,7 @@ def main() -> int:
     refresh_telemetry_files()
     threading.Thread(target=child_stdout_loop, args=(child,), daemon=True).start()
     threading.Thread(target=child_stderr_loop, args=(child,), daemon=True).start()
+    _start_github_heartbeat_thread()
 
     try:
         for raw in sys.stdin:
