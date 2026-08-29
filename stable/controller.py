@@ -39,8 +39,8 @@ import urllib.request
 from pathlib import Path
 from typing import Any
 
-APP_NAME = "Qwen Roblox Enforced Proxy V6.3.21"
-VERSION = "6.3.21"
+APP_NAME = "Qwen Roblox Enforced Proxy V6.3.22"
+VERSION = "6.3.22"
 
 LOCALAPPDATA = Path(os.environ.get("LOCALAPPDATA", str(Path.home())))
 STATE_DIR = LOCALAPPDATA / "QwenRobloxEnforcedProxy"
@@ -1549,7 +1549,15 @@ def _validate_benchmark_record_request(
 
     events = list(existing_events or []) + markers
     progress = _benchmark_progress_from_events(events)
-    decided = set(progress.get("results") or {})
+
+    # Validation must use the complete run event set. benchmark_progress.results
+    # is intentionally truncated for heartbeat display, so it cannot be the
+    # authority for large-suite completeness checks.
+    decided: set[str] = set()
+    for event in events:
+        match = _BENCH_MARKER_RE.fullmatch(str(event or "").strip())
+        if match:
+            decided.add(match.group(1).upper())
 
     required_by_pack = {
         "SP01": {f"S{i:03d}" for i in range(1, 13)},
@@ -1588,14 +1596,35 @@ def _validate_benchmark_record_request(
         progress = _benchmark_progress_from_events(events)
 
     if batch:
-        required_all = {f"S{i:03d}" for i in range(1, 25)}
-        decided = set(progress.get("results") or {})
-        completed_packs = {str(x).upper() for x in (progress.get("pack_complete_markers") or [])}
+        completed_packs: set[str] = set()
+        for event in events:
+            match = _BENCH_PACK_RE.fullmatch(str(event or "").strip())
+            if match:
+                completed_packs.add(str(match.group(1)).upper())
+
+        if batch.startswith("scripting-s001-s024-"):
+            required_all = {f"S{i:03d}" for i in range(1, 25)}
+            required_packs = {"SP01", "SP02"}
+        elif batch.startswith("scripting-s001-s280-"):
+            required_all = {f"S{i:03d}" for i in range(1, 281)}
+            required_packs = {f"SP{i:02d}" for i in range(1, 22)}
+        else:
+            return [], (
+                "Unsupported scripting batch ID. Use 'scripting-s001-s024-' for the legacy starter batch "
+                "or 'scripting-s001-s280-' for the full scripting certification."
+            )
+
         if not required_all.issubset(decided):
             missing = sorted(required_all - decided)
-            return [], f"Batch cannot complete; missing concrete decisions: {', '.join(missing)}."
-        if not {"SP01", "SP02"}.issubset(completed_packs):
-            return [], "Batch cannot complete until both SP01 and SP02 completion records exist."
+            preview = ", ".join(missing[:24])
+            if len(missing) > 24:
+                preview += f", ... (+{len(missing) - 24} more)"
+            return [], f"Batch cannot complete; missing concrete decisions: {preview}."
+
+        if not required_packs.issubset(completed_packs):
+            missing_packs = sorted(required_packs - completed_packs)
+            return [], f"Batch cannot complete; missing pack completion records: {', '.join(missing_packs)}."
+
         markers.append(f"[BENCH_BATCH_COMPLETE:{batch}]")
 
     if not markers:
@@ -5113,7 +5142,7 @@ SUPERVISOR_BENCHMARK_RECORD_TOOL = {
     "description": (
         "Controller-owned benchmark reporting. After real evidence exists, submit multiple S### decisions in one structured call. "
         "Use this instead of printing BENCH markers through execute_luau. SP01-SP21 pack completion is rejected until every "
-        "capability assigned to that pack has a concrete decision. The legacy starter batch completion remains scoped to S001-S024/SP01-SP02."
+        "capability assigned to that pack has a concrete decision. Batch completion distinguishes the legacy S001-S024 starter batch from the full S001-S280 scripting certification; full completion requires all 280 decisions and SP01-SP21."
     ),
     "inputSchema": {
         "type": "object",
@@ -6456,6 +6485,46 @@ def self_test_main() -> int:
     }, [])
     if not unknown_pack_reason or "Unknown benchmark pack ID" not in unknown_pack_reason:
         failures.append(f"V6.3.21 unknown pack was not rejected: {unknown_pack_reason!r}")
+
+    # V6.3.22 regression: full scripting batch completion cannot be claimed
+    # until S001-S280 and SP01-SP21 are all controller-recorded.
+    full_existing = [f"[BENCH:S{i:03d}:PASS:verified]" for i in range(1, 281)]
+    full_existing.extend([f"[BENCH_PACK_COMPLETE:SP{i:02d}]" for i in range(1, 22)])
+    full_markers, full_reason = _validate_benchmark_record_request({
+        "run_id": "selftest-full-scripting",
+        "batch_complete": "scripting-s001-s280-selftest-full",
+    }, full_existing)
+    if full_reason or full_markers != ["[BENCH_BATCH_COMPLETE:scripting-s001-s280-selftest-full]"]:
+        failures.append(f"V6.3.22 valid full scripting batch rejected: {full_reason!r} {full_markers!r}")
+
+    premature_full_existing = [f"[BENCH:S{i:03d}:PASS]" for i in range(1, 37)]
+    premature_full_existing.extend([
+        "[BENCH_PACK_COMPLETE:SP01]",
+        "[BENCH_PACK_COMPLETE:SP02]",
+        "[BENCH_PACK_COMPLETE:SP03]",
+    ])
+    _, premature_full_reason = _validate_benchmark_record_request({
+        "run_id": "selftest-full-scripting",
+        "batch_complete": "scripting-s001-s280-selftest-premature",
+    }, premature_full_existing)
+    if not premature_full_reason or "missing concrete decisions" not in premature_full_reason:
+        failures.append(f"V6.3.22 premature full scripting batch was not rejected: {premature_full_reason!r}")
+
+    legacy_existing = [f"[BENCH:S{i:03d}:PASS]" for i in range(1, 25)]
+    legacy_existing.extend(["[BENCH_PACK_COMPLETE:SP01]", "[BENCH_PACK_COMPLETE:SP02]"])
+    legacy_markers, legacy_reason = _validate_benchmark_record_request({
+        "run_id": "selftest-legacy-starter",
+        "batch_complete": "scripting-s001-s024-selftest-legacy",
+    }, legacy_existing)
+    if legacy_reason or legacy_markers != ["[BENCH_BATCH_COMPLETE:scripting-s001-s024-selftest-legacy]"]:
+        failures.append(f"V6.3.22 legacy starter batch compatibility failed: {legacy_reason!r} {legacy_markers!r}")
+
+    _, unsupported_batch_reason = _validate_benchmark_record_request({
+        "run_id": "selftest-unsupported-batch",
+        "batch_complete": "arbitrary-batch-name",
+    }, legacy_existing)
+    if not unsupported_batch_reason or "Unsupported scripting batch ID" not in unsupported_batch_reason:
+        failures.append(f"V6.3.22 unsupported batch ID was not rejected: {unsupported_batch_reason!r}")
     fake_rows = [
         {"event": "[BENCH:S001:PASS]", "event_kind": "benchmark_record", "benchmark_run_id": "old-run"},
         {"event": "[BENCH:S013:PASS]", "event_kind": "benchmark_record", "benchmark_run_id": "new-run"},
