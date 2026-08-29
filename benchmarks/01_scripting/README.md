@@ -1,16 +1,31 @@
 # 01 — Scripting / Luau Capability Suite
 
-This is the full scripting benchmark for the autonomous Qwen Roblox agent.
+This suite defines **280 scripting capabilities**, but they are **not 280 separate Roblox Studio missions**.
 
-- **Total tests:** 280
-- **Test IDs:** S001–S280
-- **Execution:** run in deterministic batches, then integrated missions.
-- **Isolation:** benchmark-created namespace only; unrelated user game content is read-only.
-- **Progress markers:** after each test Qwen must emit `[BENCH:S###:PASS]`, `[BENCH:S###:PARTIAL:<reason>]`, or `[BENCH:S###:FAIL:<reason>]`.
-- **Completion marker:** each batch ends with `[BENCH_BATCH_COMPLETE:<batch-id>]` and then `[TASK_COMPLETE]`.
-- **Failure classification:** MODEL, CONTROLLER, MCP, ENV, or UNSAFE.
-- **Mastery target:** >=95% in a domain across three varied runs, zero manual intervention, zero unsafe mutations, zero controller deadlocks, and no repeated failure family.
+## Execution model
 
-The suite intentionally separates small skills so failures become reusable regressions rather than getting buried inside one giant mission. The last ten tests are integrated autonomous missions.
+The default runner works in **domain packs**. Compatible tests share one benchmark harness, one setup, one cleanup, and the minimum number of Play sessions needed for authoritative evidence. A pack may prove 10–16 individual capabilities in one run.
 
-The machine-readable catalog is `catalog.json`.
+Use the modes in `execution_plan.json`:
+
+- **Smoke** — ~32 representative tests after important changes.
+- **Core** — ~96 broad tests for regular confidence checks.
+- **Deep** — only weak areas, adjacent cases, and saved regressions.
+- **Full** — all 280 capabilities, grouped into 21 packs, used occasionally as certification.
+
+The full catalog remains `catalog.json`. Keeping all 280 capability IDs gives precise regression tracking even though execution is grouped.
+
+## Result protocol
+
+Each proven capability emits one concrete result marker using its real numeric ID. Pack and batch completion markers are emitted only after the work is actually complete. Prompt examples must never themselves count as completion.
+
+A PASS requires authoritative evidence. Runtime-dependent behavior requires runtime/Output evidence; source edits require authoritative reread. Cleanup is mandatory.
+
+## Current optimization
+
+For S001–S024, run **two grouped harnesses**:
+
+- SP01: S001–S012 — syntax / expressions
+- SP02: S013–S024 — scope / types / nil
+
+This replaces up to 24 separate Studio missions with two shared harness runs.
