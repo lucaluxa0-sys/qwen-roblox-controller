@@ -1,267 +1,253 @@
-Task-Instance: scripting-full-run6-sp05-tables-data-20260829T0931Z
+Task-Instance: scripting-full-run6-sp06-metatables-oop-20260829T0938Z
 Benchmark-Run-ID: scripting-s001-s024-structured-run6-20260829T0806Z
 
 CONTINUE THE SAME CONTROLLER-VERIFIED SCRIPTING RUN.
-Required verified state: S001-S052 PASS and SP01-SP04 complete.
+Required verified state: S001-S068 PASS and SP01-SP05 complete.
 Live controller: 6.3.22 or newer.
 
-ONLY GOAL: prove SP05 tables_data, S053-S068.
+ONLY GOAL: prove SP06 metatables_oop, S069-S080.
 
 TARGET:
-ServerScriptService.__QWEN_SCRIPT_BENCH__.SP05_ScriptingTests
+ServerScriptService.__QWEN_SCRIPT_BENCH__.SP06_ScriptingTests
 
 MANDATORY FLOW:
-1. Work only on SP05. Do not touch earlier packs and do not call batch_complete.
-2. In Edit mode, script_read the exact target. If Studio targeting errors, list_roblox_studios once and retry the same read.
-3. If target is confirmed missing, create it only with one multi_edit pair: old_string="" -> new_string="-- QWEN_CONTROLLER_SCRIPT_BOOTSTRAP", replace_all=false.
-4. script_read exact target after bootstrap creation.
-5. Replace ONLY the exact bootstrap with EXACTLY the HARNESS below using one multi_edit pair, replace_all=false. Do not improvise.
-6. Immediately script_read exact target.
+1. Work only on SP06. Do not touch earlier packs and do not call batch_complete.
+2. In Edit mode script_read exact target. On Studio-target error, list_roblox_studios once and retry exact read.
+3. If confirmed missing, create only with one multi_edit pair old_string="" -> new_string="-- QWEN_CONTROLLER_SCRIPT_BOOTSTRAP", replace_all=false.
+4. script_read exact target.
+5. Replace ONLY exact bootstrap with EXACTLY HARNESS below in one multi_edit pair, replace_all=false. Do not improvise.
+6. Immediately script_read target.
 7. Start Play once.
-8. get_console_output once. On a Studio-target error, list_roblox_studios once and retry Output once.
-9. Verify S053-S068 individually from Output; then stop Play.
-10. supervisor_benchmark_record SAME run id with exactly S053-S068 and pack_complete=["SP05"].
-11. Require controller-verified tests_seen=68, pass=68, partial=0, fail=0, SP05 marker, gate clear.
+8. get_console_output once; on Studio-target error list_roblox_studios once and retry Output once.
+9. Verify S069-S080 individually; stop Play.
+10. supervisor_benchmark_record SAME run id with exactly S069-S080 and pack_complete=["SP06"].
+11. Require controller-verified tests_seen=80, pass=80, partial=0, fail=0, SP06 marker and clear gate.
 12. Emit [TASK_COMPLETE] and stop.
 
-Never retry an identical blocked mutation without new evidence. Do not use execute_luau to create Scripts or assign Source. No pathless whole-tree search.
+Never retry an identical blocked mutation without new evidence. Do not use execute_luau for Script creation/Source. No pathless whole-tree search.
 
 HARNESS_START
 local function runTest(id, fn)
 	local ok, err = pcall(fn)
 	if ok then
-		print("[SP05] " .. id .. " PASS")
+		print("[SP06] " .. id .. " PASS")
 	else
-		warn("[SP05] " .. id .. " FAIL: " .. tostring(err))
+		warn("[SP06] " .. id .. " FAIL: " .. tostring(err))
 	end
 end
 
-runTest("S053", function()
-	local values = {10, 20, 30}
-	values[2] = 25
-	values[#values + 1] = 40
-	assert(#values == 4)
-	assert(values[1] == 10)
-	assert(values[2] == 25)
-	assert(values[4] == 40)
-end)
-
-runTest("S054", function()
-	local config = {
-		speed = 16,
-		enabled = true,
-		name = "benchmark",
-	}
-	assert(config.speed == 16)
-	assert(config["enabled"] == true)
-	assert(config.missing == nil)
-end)
-
-runTest("S055", function()
-	local source = {nested = {value = 1}}
-	local shallow = {nested = source.nested}
-	shallow.nested.value = 2
-	assert(source.nested.value == 2)
-
-	local deep = {nested = {value = source.nested.value}}
-	deep.nested.value = 3
-	assert(source.nested.value == 2)
-	assert(deep.nested.value == 3)
-end)
-
-runTest("S056", function()
-	local function deepCopy(value, depth)
-		if type(value) ~= "table" then
-			return value
-		end
-		assert(depth < 5)
-		local result = {}
-		for key, child in pairs(value) do
-			result[deepCopy(key, depth + 1)] = deepCopy(child, depth + 1)
-		end
-		return result
+runTest("S069", function()
+	local Counter = {}
+	Counter.__index = Counter
+	function Counter.new(startValue)
+		return setmetatable({value = startValue}, Counter)
 	end
-	local original = {a = 1, nested = {b = 2}}
-	local copied = deepCopy(original, 0)
-	copied.nested.b = 9
-	assert(original.nested.b == 2)
-	assert(copied.nested.b == 9)
-end)
-
-runTest("S057", function()
-	local defaults = {speed = 16, jump = 50, enabled = true}
-	local overrides = {speed = 24, enabled = false}
-	local merged = {}
-	for key, value in pairs(defaults) do
-		merged[key] = value
+	function Counter:increment()
+		self.value += 1
+		return self.value
 	end
-	for key, value in pairs(overrides) do
-		merged[key] = value
+	local counter = Counter.new(5)
+	assert(counter:increment() == 6)
+end)
+
+runTest("S070", function()
+	local Counter = {}
+	Counter.__index = Counter
+	function Counter.new()
+		return setmetatable({value = 0}, Counter)
 	end
-	assert(merged.speed == 24)
-	assert(merged.jump == 50)
-	assert(merged.enabled == false)
-	assert(defaults.speed == 16)
-	assert(defaults.enabled == true)
-end)
-
-runTest("S058", function()
-	local values = {1, 2, 3, 4, 5, 6}
-	for index = #values, 1, -1 do
-		if values[index] % 2 == 0 then
-			table.remove(values, index)
-		end
+	function Counter:add(amount)
+		self.value += amount
 	end
-	assert(#values == 3)
-	assert(values[1] == 1)
-	assert(values[2] == 3)
-	assert(values[3] == 5)
+	local first = Counter.new()
+	local second = Counter.new()
+	first:add(5)
+	second:add(2)
+	assert(first.value == 5)
+	assert(second.value == 2)
 end)
 
-runTest("S059", function()
-	local values = {"a", "c"}
-	table.insert(values, 2, "b")
-	assert(values[2] == "b")
-	local removed = table.remove(values, 2)
-	assert(removed == "b")
-	assert(#values == 2)
-	assert(values[2] == "c")
+runTest("S071", function()
+	local Base = {}
+	Base.__index = Base
+	function Base:getValue()
+		return self.value
+	end
+
+	local Derived = {}
+	Derived.__index = Derived
+	setmetatable(Derived, {__index = Base})
+	function Derived.new(value)
+		return setmetatable({value = value}, Derived)
+	end
+	function Derived:double()
+		return self.value * 2
+	end
+
+	local first = Derived.new(3)
+	local second = Derived.new(7)
+	first.value = 4
+	assert(first:getValue() == 4)
+	assert(first:double() == 8)
+	assert(second:getValue() == 7)
 end)
 
-runTest("S060", function()
-	local values = {"alpha", "beta", "gamma"}
-	assert(table.find(values, "beta") == 2)
-	assert(table.find(values, "missing") == nil)
+runTest("S072", function()
+	local Repaired = {}
+	Repaired.__index = Repaired
+	function Repaired.new(value)
+		return setmetatable({value = value}, Repaired)
+	end
+	function Repaired:get()
+		return self.value
+	end
+	local instance = Repaired.new(72)
+	assert(instance:get() == 72)
+	assert(getmetatable(instance) == Repaired)
 end)
 
-runTest("S061", function()
-	local values = {
-		{id = "b", score = 10},
-		{id = "a", score = 10},
-		{id = "c", score = 5},
-	}
-	table.sort(values, function(left, right)
-		if left.score == right.score then
-			return left.id < right.id
-		end
-		return left.score > right.score
+runTest("S073", function()
+	local source = {answer = 73}
+	local proxy = setmetatable({}, {
+		__index = source,
+		__newindex = function()
+			error("read only")
+		end,
+	})
+	assert(proxy.answer == 73)
+	local ok = pcall(function()
+		proxy.answer = 99
 	end)
-	assert(values[1].id == "a")
-	assert(values[2].id == "b")
-	assert(values[3].id == "c")
+	assert(ok == false)
+	assert(source.answer == 73)
 end)
 
-runTest("S062", function()
-	local inventory = {
-		item_1001 = {displayName = "Potion", count = 2},
-		item_1002 = {displayName = "Potion", count = 5},
-	}
-	assert(inventory.item_1001.count == 2)
-	assert(inventory.item_1002.count == 5)
-	assert(inventory.item_1001 ~= inventory.item_1002)
+runTest("S074", function()
+	local Item = {}
+	Item.__index = Item
+	Item.__tostring = function(self)
+		return "Item<" .. self.id .. ">"
+	end
+	local instance = setmetatable({id = "S074"}, Item)
+	assert(tostring(instance) == "Item<S074>")
 end)
 
-runTest("S063", function()
-	local HttpService = game:GetService("HttpService")
-	local safeData = {
-		id = "item_1001",
-		count = 2,
-		enabled = true,
-		tags = {"healing", "small"},
-	}
-	local encoded = HttpService:JSONEncode(safeData)
-	assert(type(encoded) == "string")
-	assert(#encoded > 0)
+runTest("S075", function()
+	local Prototype = {}
+	Prototype.__index = Prototype
+	function Prototype:getValue()
+		return self.value
+	end
+	local instance = {value = 75}
+	setmetatable(instance, Prototype)
+	assert(getmetatable(Prototype) == nil)
+	assert(getmetatable(instance) == Prototype)
+	assert(instance:getValue() == 75)
 end)
 
-runTest("S064", function()
-	local function hasCycle(value, visiting, visited)
-		if type(value) ~= "table" then
+runTest("S076", function()
+	local Meta = {}
+	Meta.__index = Meta
+	function Meta:getValue()
+		return self.value
+	end
+	local original = setmetatable({value = 76}, Meta)
+	local copy = {}
+	for key, value in pairs(original) do
+		copy[key] = value
+	end
+	setmetatable(copy, getmetatable(original))
+	assert(copy ~= original)
+	assert(getmetatable(copy) == Meta)
+	assert(copy:getValue() == 76)
+end)
+
+runTest("S077", function()
+	local Component = {}
+	Component.__index = Component
+	function Component.new()
+		return setmetatable({
+			started = false,
+			destroyed = false,
+			event = Instance.new("BindableEvent"),
+			connection = nil,
+			count = 0,
+		}, Component)
+	end
+	function Component:Start()
+		assert(self.started == false)
+		self.started = true
+		self.connection = self.event.Event:Connect(function()
+			self.count += 1
+		end)
+		self.event:Fire()
+	end
+	function Component:Destroy()
+		if self.destroyed then
+			return
+		end
+		self.destroyed = true
+		if self.connection then
+			self.connection:Disconnect()
+		end
+		self.event:Destroy()
+	end
+	local component = Component.new()
+	component:Start()
+	task.wait()
+	assert(component.started == true)
+	assert(component.count == 1)
+	component:Destroy()
+	assert(component.destroyed == true)
+end)
+
+runTest("S078", function()
+	local Component = {}
+	Component.__index = Component
+	function Component.new()
+		local event = Instance.new("BindableEvent")
+		local connection = event.Event:Connect(function()
+		end)
+		return setmetatable({
+			event = event,
+			connection = connection,
+			destroyed = false,
+		}, Component)
+	end
+	function Component:Destroy()
+		if self.destroyed then
 			return false
 		end
-		if visiting[value] then
-			return true
-		end
-		if visited[value] then
-			return false
-		end
-		visiting[value] = true
-		for key, child in pairs(value) do
-			if hasCycle(key, visiting, visited) then
-				return true
-			end
-			if hasCycle(child, visiting, visited) then
-				return true
-			end
-		end
-		visiting[value] = nil
-		visited[value] = true
-		return false
+		self.destroyed = true
+		self.connection:Disconnect()
+		self.event:Destroy()
+		return true
 	end
-	local cyclic = {}
-	cyclic.self = cyclic
-	assert(hasCycle(cyclic, {}, {}) == true)
-	assert(hasCycle({a = {b = 2}}, {}, {}) == false)
+	local component = Component.new()
+	assert(component.connection.Connected == true)
+	assert(component:Destroy() == true)
+	assert(component.connection.Connected == false)
+	assert(component:Destroy() == false)
 end)
 
-runTest("S065", function()
-	local metadata = setmetatable({}, {__mode = "k"})
-	local owner = {}
-	metadata[owner] = {connectionCount = 1}
-	assert(metadata[owner].connectionCount == 1)
-	local meta = getmetatable(metadata)
-	assert(meta ~= nil)
-	assert(meta.__mode == "k")
-	metadata[owner] = nil
-	assert(metadata[owner] == nil)
-end)
-
-runTest("S066", function()
-	local function normalize(input)
-		local count = tonumber(input.count) or 0
-		if count < 0 then
-			count = 0
-		end
-		return {
-			id = tostring(input.id or ""),
-			count = count,
-			enabled = input.enabled == true,
-		}
+runTest("S079", function()
+	local plain = {value = 79}
+	local function getValue(state)
+		return state.value
 	end
-	local result = normalize({id = 42, count = "-3", enabled = 1})
-	assert(result.id == "42")
-	assert(result.count == 0)
-	assert(result.enabled == false)
+	assert(getmetatable(plain) == nil)
+	assert(getValue(plain) == 79)
 end)
 
-runTest("S067", function()
-	local function sameItem(left, right)
-		return left.id == right.id and left.count == right.count
+runTest("S080", function()
+	local object = {value = 80}
+	function object:getValue()
+		return self.value
 	end
-	local first = {id = "item_1", count = 3}
-	local second = {id = "item_1", count = 3}
-	assert(first ~= second)
-	assert(sameItem(first, second) == true)
-	second.count = 4
-	assert(sameItem(first, second) == false)
+	local wrongReceiver = {value = 8}
+	assert(object.getValue(wrongReceiver) == 8)
+	assert(object:getValue() == 80)
 end)
 
-runTest("S068", function()
-	local sharedDefaults = {items = {}}
-	local brokenA = {items = sharedDefaults.items}
-	local brokenB = {items = sharedDefaults.items}
-	table.insert(brokenA.items, "shared")
-	assert(brokenB.items[1] == "shared")
-
-	local function newState()
-		return {items = {}}
-	end
-	local fixedA = newState()
-	local fixedB = newState()
-	table.insert(fixedA.items, "private")
-	assert(fixedA.items[1] == "private")
-	assert(#fixedB.items == 0)
-end)
-
-print("[SP05] COMPLETE")
+print("[SP06] COMPLETE")
 HARNESS_END
