@@ -1,25 +1,25 @@
-Task-Instance: run6-postcomplete-gate-recovery-20260829T0904Z
+Task-Instance: run6-postcomplete-runtime-gate-finish-20260829T0907Z
 
-RUN6 IS ALREADY CONTROLLER-VERIFIED COMPLETE: 24/24 PASS, SP01+SP02 complete, batch marker accepted.
+RUN6 REMAINS CONTROLLER-VERIFIED COMPLETE: 24/24 PASS, SP01+SP02 complete, batch marker accepted.
 
-A previous generation incorrectly touched the completed SP02 script after completion. DO NOT continue cleanup or benchmark work.
+The accidental post-completion SP02 edit has now been reread and Play is already running because the controller correctly required runtime verification.
 
-CURRENT CONTROLLER GATE REQUIRES EXACTLY ONE RECOVERY:
-1. Call script_read on exactly:
+ONLY RECOVERY ACTIONS:
+1. Call get_console_output exactly once.
+2. If no relevant runtime error is reported for:
    ServerScriptService.__QWEN_SCRIPT_BENCH__.SP02_ScriptingTests
-2. If that exact script_read succeeds and clears the reread gate, emit exactly:
+   stop Play exactly once.
+3. Confirm the controller gate is clear only if needed.
+4. Emit exactly:
    [TASK_COMPLETE]
-3. Stop immediately.
+5. Stop immediately.
 
 ABSOLUTELY FORBIDDEN:
 - multi_edit
 - execute_luau
 - create_instances
-- delete/move/rename anything
-- Play mode
-- Output inspection
+- any source mutation
 - benchmark reporting
-- touching SP01
-- any second mutation
-
-If the exact script_read reports Script not found, call get_studio_state once; if Edit mode, retry the SAME exact path once. Do not invent a new path and do not mutate anything.
+- rerunning SP01/SP02
+- starting another Play session
+- any cleanup mutation in this task
