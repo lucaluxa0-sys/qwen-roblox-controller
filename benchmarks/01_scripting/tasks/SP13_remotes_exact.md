@@ -45,7 +45,8 @@ end
 
 local remote = runtimeRoot:WaitForChild("Event", 2)
 local request = runtimeRoot:WaitForChild("Request", 2)
-local allowedPart = workspace:WaitForChild("__QWEN_SP13_ALLOWED_PART__", 2)
+local allowedRoot = workspace:WaitForChild("__QWEN_SP13_ALLOWED_ROOT__", 2)
+local allowedPart = allowedRoot and allowedRoot:WaitForChild("__QWEN_SP13_ALLOWED_PART__", 2)
 if not remote or not request or not allowedPart then
 	return
 end
@@ -168,7 +169,6 @@ allowedPart.Anchored = true
 allowedPart.CanCollide = false
 allowedPart.Transparency = 1
 allowedPart.Parent = allowedRoot
-allowedPart.Parent = workspace
 
 local secret = Instance.new("StringValue")
 secret.Name = "__QWEN_SP13_SERVER_SECRET__"
@@ -294,7 +294,7 @@ eventConnection = remote.OnServerEvent:Connect(function(player, payload)
 		if typeof(payload.target) ~= "Instance" then
 			return
 		end
-		local allowed = payload.target == allowedPart
+		local allowed = payload.target:IsDescendantOf(allowedRoot)
 		if payload.expected == "allowed" then
 			observed.allowedInstance = allowed
 		elseif payload.expected == "rejected" then
