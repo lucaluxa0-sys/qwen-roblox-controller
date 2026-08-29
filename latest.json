@@ -2,9 +2,9 @@
   "schema_version": 1,
   "version": "6.3.14",
   "channel": "stable",
-  "controller_path": "stable/controller.py",
+  "controller_path": "releases/6.3.14/controller.py",
   "release_path": "releases/6.3.14/controller.py",
   "sha256": "721869b093d424fc7cdd6e9586a24dabcdcec1e6addc0afd3f659778bb176db9",
   "published_at": "2026-08-29T07:50:18Z",
-  "notes": "Adds a benchmark-specific context guard: when the active target is already inside __QWEN_SCRIPT_BENCH__, pathless search_game_tree calls are blocked and redirected to the exact script or a narrow benchmark parent path. This prevents repeated whole-DataModel dumps from consuming thousands of prompt tokens. Includes the 6.3.13 inert-bootstrap runtime-gate exemption."
+  "notes": "Uses the immutable 6.3.14 release artifact as controller_path to avoid raw branch-propagation races after stable promotion. Adds the benchmark whole-tree context guard and includes the 6.3.13 inert-bootstrap runtime-gate exemption."
 }
