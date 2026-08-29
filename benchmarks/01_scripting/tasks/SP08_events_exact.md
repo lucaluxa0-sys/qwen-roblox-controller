@@ -9,7 +9,7 @@ Controller 6.3.26+ required. Never create a new benchmark run. Preserve the harn
 
 ## Required flow
 1. Narrow script_read of the exact target. If missing in Edit mode, follow the controller's exact normal-Script bootstrap creation path:
-   - supervisor_decision_trace
+   - supervisor_decision_trace with intended_script_class="Script"
    - one multi_edit with old_string="" and new_string="-- QWEN_CONTROLLER_SCRIPT_BOOTSTRAP"
    - script_read same path.
 2. Before replacing bootstrap/current source, call supervisor_decision_trace.
