@@ -39,8 +39,8 @@ import urllib.request
 from pathlib import Path
 from typing import Any
 
-APP_NAME = "Qwen Roblox Enforced Proxy V6.3.30"
-VERSION = "6.3.30"
+APP_NAME = "Qwen Roblox Enforced Proxy V6.3.32"
+VERSION = "6.3.32"
 
 LOCALAPPDATA = Path(os.environ.get("LOCALAPPDATA", str(Path.home())))
 STATE_DIR = LOCALAPPDATA / "QwenRobloxEnforcedProxy"
@@ -5398,6 +5398,40 @@ SUPERVISOR_STOP_LOCAL_QWEN_STACK_TOOL = {
 }
 
 
+SUPERVISOR_INSTALL_QWEN_POWER_BUTTONS_TOOL = {
+    "name": "supervisor_install_qwen_power_buttons",
+    "description": (
+        "Install paired Windows 'Power Off Qwen' and 'Power On Qwen' desktop shortcuts plus "
+        "POWER_OFF_QWEN.ps1 and POWER_ON_QWEN.ps1 command-line fallbacks. Power Off stops the autonomous "
+        "manager/runner/controller/updaters and LM Studio llama-server backend while preserving Roblox Studio and the LM Studio GUI. "
+        "Power On relaunches the local qwen_full_auto_manager.py, which restores the normal full-auto stack."
+    ),
+    "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": False,
+    },
+}
+
+# Backward-compatible alias for the unreleased 6.3.31 stop-button task.
+SUPERVISOR_INSTALL_STOP_QWEN_BUTTON_TOOL = {
+    "name": "supervisor_install_stop_qwen_button",
+    "description": (
+        "Backward-compatible alias. Installs the paired Power Off Qwen / Power On Qwen controls and PowerShell scripts."
+    ),
+    "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": False,
+    },
+}
+
+
+POWER_OFF_QWEN_SCRIPT_FILE = AGENT_INSTALL_DIR / "POWER_OFF_QWEN.ps1"
+POWER_ON_QWEN_SCRIPT_FILE = AGENT_INSTALL_DIR / "POWER_ON_QWEN.ps1"
+STOP_QWEN_SCRIPT_FILE = AGENT_INSTALL_DIR / "STOP_QWEN.ps1"
+
+
 def _powershell_executable() -> str:
     found = shutil.which("powershell.exe") or shutil.which("powershell")
     if found:
@@ -5420,12 +5454,54 @@ $targets = Get-CimInstance Win32_Process | Where-Object {
         ($_.Name -ieq 'llama-server.exe' -and ($cmd -match '\\.lmstudio\\extensions\\backends\\' -or $exe -match '\\.lmstudio\\extensions\\backends\\')) -or
         ($cmd -match 'qwen_full_auto_manager\.py') -or
         ($cmd -match 'qwen_direct_autopilot_runner\.py') -or
-        ($cmd -match 'qwen_autopilot_runner\.py')
+        ($cmd -match 'qwen_autopilot_runner\.py') -or
+        ($cmd -match 'qwen_controller_launcher\.py') -or
+        ($cmd -match 'qwen_roblox_enforced_proxy_current\.py') -or
+        ($cmd -match 'qwen_model_auto_updater\.py') -or
+        ($cmd -match 'qwen_controller_updater\.py')
     )
 }
 $targets | Sort-Object ProcessId -Descending | ForEach-Object {
     try { Stop-Process -Id $_.ProcessId -Force -ErrorAction Stop } catch {}
 }
+"""
+
+
+def _local_qwen_power_on_script() -> str:
+    return r"""
+$ErrorActionPreference = 'Stop'
+$installDir = Join-Path $env:LOCALAPPDATA 'QwenRobloxAgent'
+$manager = Join-Path $installDir 'qwen_full_auto_manager.py'
+$pythonw = Join-Path $env:LOCALAPPDATA 'Python\pythoncore-3.14-64\pythonw.exe'
+$python = Join-Path $env:LOCALAPPDATA 'Python\pythoncore-3.14-64\python.exe'
+
+$alreadyRunning = Get-CimInstance Win32_Process | Where-Object {
+    ([string]$_.CommandLine) -match 'qwen_full_auto_manager\.py'
+}
+if ($alreadyRunning) {
+    Write-Host '[QWEN] Power is already ON.'
+    exit 0
+}
+if (-not (Test-Path -LiteralPath $manager)) {
+    throw "Qwen full-auto manager not found: $manager"
+}
+if (-not (Test-Path -LiteralPath $pythonw)) {
+    $pythonw = $python
+}
+if (-not (Test-Path -LiteralPath $pythonw)) {
+    throw "Python launcher not found: $pythonw"
+}
+
+Write-Host '[QWEN] Powering ON...'
+Start-Process -FilePath $pythonw -ArgumentList ('"' + $manager + '"') -WorkingDirectory $installDir -WindowStyle Hidden
+Start-Sleep -Seconds 2
+$started = Get-CimInstance Win32_Process | Where-Object {
+    ([string]$_.CommandLine) -match 'qwen_full_auto_manager\.py'
+}
+if (-not $started) {
+    throw 'Qwen full-auto manager did not start.'
+}
+Write-Host '[QWEN] Power is ON.'
 """
 
 
@@ -5463,10 +5539,120 @@ def _schedule_stop_local_qwen_stack() -> tuple[dict[str, Any] | None, str | None
         "stops": [
             "qwen_full_auto_manager.py",
             "qwen_direct_autopilot_runner.py / qwen_autopilot_runner.py",
+            "qwen_controller_launcher.py / qwen_roblox_enforced_proxy_current.py",
+            "qwen_model_auto_updater.py / qwen_controller_updater.py",
             "LM Studio llama-server.exe under .lmstudio\\extensions\\backends",
         ],
         "preserves": ["Roblox Studio", "LM Studio GUI"],
     }, None
+
+
+def _install_qwen_power_buttons() -> tuple[dict[str, Any] | None, str | None]:
+    if os.name != "nt":
+        return None, "Qwen power buttons are Windows-only."
+    try:
+        AGENT_INSTALL_DIR.mkdir(parents=True, exist_ok=True)
+
+        off_ps1 = "$ErrorActionPreference = 'SilentlyContinue'\r\n" + _local_qwen_stop_script().lstrip()
+        on_ps1 = _local_qwen_power_on_script().lstrip()
+        POWER_OFF_QWEN_SCRIPT_FILE.write_text(off_ps1, encoding="utf-8")
+        POWER_ON_QWEN_SCRIPT_FILE.write_text(on_ps1, encoding="utf-8")
+
+        # Keep the old local script name as a compatibility wrapper.
+        STOP_QWEN_SCRIPT_FILE.write_text(
+            "& '" + str(POWER_OFF_QWEN_SCRIPT_FILE).replace("'", "''") + "'\r\n",
+            encoding="utf-8",
+        )
+
+        desktop = Path(os.environ.get("USERPROFILE", str(Path.home()))) / "Desktop"
+        desktop.mkdir(parents=True, exist_ok=True)
+        off_shortcut = desktop / "Power Off Qwen.lnk"
+        on_shortcut = desktop / "Power On Qwen.lnk"
+        legacy_shortcut = desktop / "Stop Qwen.lnk"
+        try:
+            legacy_shortcut.unlink(missing_ok=True)
+        except Exception:
+            pass
+
+        def ps_quote(value: str) -> str:
+            return value.replace("'", "''")
+
+        target = _powershell_executable()
+
+        def create_shortcut(shortcut_path: Path, script_path: Path, description: str) -> tuple[bool, str]:
+            arguments = '-NoProfile -ExecutionPolicy Bypass -File "' + str(script_path) + '"'
+            command = (
+                "$w=New-Object -ComObject WScript.Shell; "
+                "$s=$w.CreateShortcut('" + ps_quote(str(shortcut_path)) + "'); "
+                "$s.TargetPath='" + ps_quote(target) + "'; "
+                "$s.Arguments='" + ps_quote(arguments) + "'; "
+                "$s.WorkingDirectory='" + ps_quote(str(AGENT_INSTALL_DIR)) + "'; "
+                "$s.Description='" + ps_quote(description) + "'; "
+                "$s.Save()"
+            )
+            result = subprocess.run(
+                [_powershell_executable(), "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", command],
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                timeout=30,
+                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+            )
+            ok = result.returncode == 0 and shortcut_path.exists()
+            detail = (result.stderr or result.stdout or "")[-1000:]
+            return ok, detail
+
+        off_ok, off_detail = create_shortcut(
+            off_shortcut,
+            POWER_OFF_QWEN_SCRIPT_FILE,
+            "Power off local Qwen Roblox agent and LM Studio model backend",
+        )
+        if not off_ok:
+            return None, "Could not create Power Off Qwen desktop shortcut: " + (off_detail or "unknown error")
+
+        on_ok, on_detail = create_shortcut(
+            on_shortcut,
+            POWER_ON_QWEN_SCRIPT_FILE,
+            "Power on local Qwen Roblox full-auto manager",
+        )
+        if not on_ok:
+            return None, "Could not create Power On Qwen desktop shortcut: " + (on_detail or "unknown error")
+
+        return {
+            "accepted": True,
+            "installed": True,
+            "desktop_shortcuts": {
+                "power_off": str(off_shortcut),
+                "power_on": str(on_shortcut),
+            },
+            "scripts": {
+                "power_off": str(POWER_OFF_QWEN_SCRIPT_FILE),
+                "power_on": str(POWER_ON_QWEN_SCRIPT_FILE),
+                "legacy_stop": str(STOP_QWEN_SCRIPT_FILE),
+            },
+            "powershell_commands": {
+                "power_off": (
+                    'powershell -NoProfile -ExecutionPolicy Bypass -File "'
+                    + str(POWER_OFF_QWEN_SCRIPT_FILE)
+                    + '"'
+                ),
+                "power_on": (
+                    'powershell -NoProfile -ExecutionPolicy Bypass -File "'
+                    + str(POWER_ON_QWEN_SCRIPT_FILE)
+                    + '"'
+                ),
+            },
+            "preserves_on_power_off": ["Roblox Studio", "LM Studio GUI"],
+            "power_on_entrypoint": str(AGENT_INSTALL_DIR / "qwen_full_auto_manager.py"),
+        }, None
+    except Exception as exc:
+        return None, f"Could not install Qwen power buttons: {exc!r}"
+
+
+def _install_stop_qwen_button() -> tuple[dict[str, Any] | None, str | None]:
+    # Backward-compatible 6.3.31 alias.
+    return _install_qwen_power_buttons()
 
 
 SUPERVISOR_DECISION_TRACE_TOOL = {
@@ -5737,6 +5923,10 @@ def augment_tools_list(response: dict[str, Any]) -> dict[str, Any]:
             tools.append(SUPERVISOR_RESUME_TOOL)
         if "supervisor_stop_local_qwen_stack" not in seen:
             tools.append(SUPERVISOR_STOP_LOCAL_QWEN_STACK_TOOL)
+        if "supervisor_install_qwen_power_buttons" not in seen:
+            tools.append(SUPERVISOR_INSTALL_QWEN_POWER_BUTTONS_TOOL)
+        if "supervisor_install_stop_qwen_button" not in seen:
+            tools.append(SUPERVISOR_INSTALL_STOP_QWEN_BUTTON_TOOL)
         if "supervisor_decision_trace" not in seen:
             tools.append(SUPERVISOR_DECISION_TRACE_TOOL)
         if "supervisor_benchmark_record" not in seen:
@@ -6102,6 +6292,14 @@ def handle_parent_message(child: subprocess.Popen[str], message: dict[str, Any])
             packet = build_resume_packet()
             if "id" in message:
                 emit(mcp_tool_ok_response(request_id, packet))
+            return
+        if name in {"supervisor_install_qwen_power_buttons", "supervisor_install_stop_qwen_button"}:
+            payload, install_reason = _install_qwen_power_buttons()
+            if "id" in message:
+                if install_reason:
+                    emit(mcp_tool_error_response(request_id, install_reason))
+                else:
+                    emit(mcp_tool_ok_response(request_id, payload))
             return
         if name == "supervisor_stop_local_qwen_stack":
             if str(args.get("confirm") or "") != "STOP_LOCAL_QWEN_STACK":
@@ -7309,6 +7507,46 @@ def self_test_main() -> int:
     }, ["[BENCH:S080:PASS:original evidence]"])
     if not immutable_reason_same_6328 or "evidence reason" not in immutable_reason_same_6328:
         failures.append(f"V6.3.28 same-status result reason could be rewritten: {immutable_reason_same_6328!r}")
+
+    # V6.3.32 regression: paired Power Off / Power On controls are exposed,
+    # remain callable from PowerShell, and keep the full-auto manager as the
+    # single restart entrypoint.
+    if SUPERVISOR_INSTALL_QWEN_POWER_BUTTONS_TOOL.get("name") != "supervisor_install_qwen_power_buttons":
+        failures.append("V6.3.32 power-buttons tool name drifted")
+    power_desc_6332 = str(SUPERVISOR_INSTALL_QWEN_POWER_BUTTONS_TOOL.get("description") or "")
+    for required_text_6332 in ("Power Off Qwen", "Power On Qwen", "POWER_OFF_QWEN.ps1", "POWER_ON_QWEN.ps1", "LM Studio GUI"):
+        if required_text_6332 not in power_desc_6332:
+            failures.append(f"V6.3.32 power-buttons description missing {required_text_6332!r}")
+
+    stop_script_6332 = _local_qwen_stop_script()
+    for required_text_6332 in (
+        "qwen_controller_launcher\\.py",
+        "qwen_roblox_enforced_proxy_current\\.py",
+        "qwen_model_auto_updater\\.py",
+        "llama-server.exe",
+    ):
+        if required_text_6332 not in stop_script_6332:
+            failures.append(f"V6.3.32 power-off script missing {required_text_6332!r}")
+
+    start_script_6332 = _local_qwen_power_on_script()
+    for required_text_6332 in (
+        "QwenRobloxAgent",
+        "qwen_full_auto_manager\\.py",
+        "pythonw.exe",
+        "Start-Process",
+        "Power is ON",
+    ):
+        if required_text_6332 not in start_script_6332:
+            failures.append(f"V6.3.32 power-on script missing {required_text_6332!r}")
+
+    if POWER_OFF_QWEN_SCRIPT_FILE.name != "POWER_OFF_QWEN.ps1":
+        failures.append("V6.3.32 power-off script filename drifted")
+    if POWER_ON_QWEN_SCRIPT_FILE.name != "POWER_ON_QWEN.ps1":
+        failures.append("V6.3.32 power-on script filename drifted")
+
+    # V6.3.31 backward compatibility: old installer tool still exists as an alias.
+    if SUPERVISOR_INSTALL_STOP_QWEN_BUTTON_TOOL.get("name") != "supervisor_install_stop_qwen_button":
+        failures.append("V6.3.31 stop-button alias drifted")
 
     # V6.3.30 regression: local shutdown remains explicit and narrowly scoped.
     if SUPERVISOR_STOP_LOCAL_QWEN_STACK_TOOL.get("name") != "supervisor_stop_local_qwen_stack":
