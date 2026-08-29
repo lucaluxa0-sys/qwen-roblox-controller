@@ -1596,7 +1596,11 @@ def _validate_benchmark_record_request(
         progress = _benchmark_progress_from_events(events)
 
     if batch:
-        completed_packs = {str(x).upper() for x in (progress.get("pack_complete_markers") or [])}
+        completed_packs: set[str] = set()
+        for event in events:
+            match = _BENCH_PACK_RE.fullmatch(str(event or "").strip())
+            if match:
+                completed_packs.add(str(match.group(1)).upper())
 
         if batch.startswith("scripting-s001-s024-"):
             required_all = {f"S{i:03d}" for i in range(1, 25)}
