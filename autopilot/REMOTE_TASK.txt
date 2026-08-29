@@ -1,39 +1,16 @@
-Task-Instance: sp07-function-create-immediate-20260829T1142Z
+Task-Instance: hold-sp07-for-exec-bootstrap-fallback-6.3.29-20260829T1145Z
 Benchmark-Run-ID: scripting-s001-s024-structured-run6-20260829T0806Z
 
-ACTIVE CONTROLLER STATE IS AUTHORITATIVE:
-- SP07_Function is confirmed missing in Edit mode.
-- A FRESH supervisor_decision_trace at 1788003420.6025014 already declared intended_script_class="ModuleScript".
-- That fresh trace is the authorization for the creation mutation.
+PAUSE STUDIO MUTATIONS UNTIL CONTROLLER 6.3.29 IS LIVE.
 
-YOUR FIRST ROBLOX TOOL CALL MUST BE create_instances. DO NOT TRACE AGAIN BEFORE IT.
+Reason: the live MCP/model path is not reliably using create_instances for missing ModuleScripts. 6.3.29 adds one deterministic execute_luau fallback limited to a proven-missing benchmark ModuleScript/LocalScript, exact declared class/path, and exact inert bootstrap Source.
 
-Call create_instances exactly once with ONE object:
-className="ModuleScript"
-name="SP07_Function"
-parent="ServerScriptService.__QWEN_SCRIPT_BENCH__"
-properties.Source="-- QWEN_CONTROLLER_SCRIPT_BOOTSTRAP"
-
-Then:
-1. script_read exactly ServerScriptService.__QWEN_SCRIPT_BENCH__.SP07_Function
-2. inspect_instance exactly ServerScriptService.__QWEN_SCRIPT_BENCH__.SP07_Function
-3. Require ClassName=ModuleScript and exact bootstrap Source.
-4. supervisor_decision_trace:
-   goal="SP07_Function bootstrap created safely"
-   evidence=["create_instances succeeded","authoritative reread exact bootstrap","inspect ClassName=ModuleScript"]
-   decision="Stop with blocker resolved"
-   actual_result="SP07_Function ModuleScript bootstrap verified"
-   next_action="await SP07_C audit and source installation task"
-   confidence="high"
-5. Emit [TASK_COMPLETE] and STOP.
-
-ABSOLUTELY FORBIDDEN BEFORE create_instances:
-- supervisor_decision_trace (already done)
-- script_read
-- inspect_instance
-- search
-- list_roblox_studios
-- get_studio_state
-- multi_edit
-- execute_luau
-- benchmark reporting
+DO NOT call Roblox Studio tools.
+DO NOT call supervisor_benchmark_record.
+ONLY call supervisor_decision_trace once:
+goal="Hold SP07 until exact ModuleScript bootstrap fallback is live"
+evidence=["SP07_Function remains proven missing","6.3.29 is pending activation"]
+decision="Do not mutate Studio"
+next_action="await fresh recovery task after heartbeat proves 6.3.29 live"
+confidence="high"
+Then emit [TASK_COMPLETE] and stop.
