@@ -39,8 +39,8 @@ import urllib.request
 from pathlib import Path
 from typing import Any
 
-APP_NAME = "Qwen Roblox Enforced Proxy V6.3.17"
-VERSION = "6.3.17"
+APP_NAME = "Qwen Roblox Enforced Proxy V6.3.18"
+VERSION = "6.3.18"
 
 LOCALAPPDATA = Path(os.environ.get("LOCALAPPDATA", str(Path.home())))
 STATE_DIR = LOCALAPPDATA / "QwenRobloxEnforcedProxy"
@@ -454,6 +454,8 @@ def next_required_action_from_state(state: dict[str, Any]) -> str:
         kind = blocker.get("classification")
         stage = blocker.get("stage")
         path = blocker.get("path") or state.get("last_script_target") or "the implicated script"
+        if kind == "benchmark_script_missing":
+            return _benchmark_missing_script_message(path)
         if kind == "syntax_error":
             if mode == "play":
                 return "Stop Play, then read the implicated script source."
@@ -2144,6 +2146,75 @@ def _script_creation_rows(value: Any) -> list[tuple[str, str | None]]:
 
     walk(value)
     return rows
+
+
+def _benchmark_missing_script_create_matches(args: dict[str, Any] | None, target: str) -> bool:
+    """True only when create_instances contains the exact missing benchmark Script bootstrap."""
+    wanted = canonical_target(target)
+    if not wanted or "__qwen_script_bench__" not in wanted.lower() or "." not in wanted:
+        return False
+    expected_name = wanted.split(".")[-1]
+    expected_parent = ".".join(wanted.split(".")[:-1])
+    matched = False
+
+    def walk(node: Any) -> None:
+        nonlocal matched
+        if matched:
+            return
+        if isinstance(node, list):
+            for item in node:
+                walk(item)
+            return
+        if not isinstance(node, dict):
+            return
+
+        lowered = {str(k).lower(): v for k, v in node.items()}
+        props = lowered.get("properties")
+        prop_lowered = {str(k).lower(): v for k, v in props.items()} if isinstance(props, dict) else {}
+
+        cls = lowered.get("classname")
+        if cls is None:
+            cls = lowered.get("class_name")
+        if cls is None:
+            cls = lowered.get("class")
+        name = lowered.get("name")
+        if name is None:
+            name = prop_lowered.get("name")
+        parent = lowered.get("parent")
+        if parent is None:
+            parent = prop_lowered.get("parent")
+        source = lowered.get("source")
+        if source is None:
+            source = prop_lowered.get("source")
+
+        if (
+            isinstance(cls, str)
+            and cls.lower() == "script"
+            and str(name or "").lower() == expected_name.lower()
+            and canonical_target(str(parent or "")) == canonical_target(expected_parent)
+            and normalize_source(str(source or "")) == SCRIPT_BOOTSTRAP_SOURCE
+        ):
+            matched = True
+            return
+
+        for child in node.values():
+            if isinstance(child, (dict, list)):
+                walk(child)
+
+    walk(args or {})
+    return matched
+
+
+def _benchmark_missing_script_message(target: str) -> str:
+    wanted = canonical_target(target)
+    name = wanted.split(".")[-1] if wanted else "the missing benchmark Script"
+    parent = ".".join(wanted.split(".")[:-1]) if "." in wanted else "ServerScriptService.__QWEN_SCRIPT_BENCH__"
+    return (
+        f"Benchmark Script {wanted or target} is confirmed missing in Edit mode. "
+        f"Use create_instances to create Script name={name!r} parent={parent!r} with Source exactly "
+        f"{SCRIPT_BOOTSTRAP_SOURCE!r}. Then script_read that exact path before any multi_edit. "
+        "Do not multi_edit a nonexistent Script and do not use execute_luau to create it."
+    )
 
 
 def script_creation_policy_reason(name: str, args: dict[str, Any] | None) -> str | None:
@@ -3923,6 +3994,19 @@ def block_reason_for_call(name: str, args: dict[str, Any] | None) -> str | None:
                 elif n != "supervisor_status":
                     return "Blocked: stop Play with start_stop_play(is_start=false), then retry the same script_read path."
 
+        elif kind == "benchmark_script_missing":
+            if n in {"supervisor_status", "supervisor_resume", "get_studio_state", "list_roblox_studios"}:
+                required_action = True
+            elif n == "script_read" and target_matches(bpath, extract_target(args)):
+                required_action = True
+            elif n == "create_instances":
+                if _benchmark_missing_script_create_matches(args, bpath):
+                    required_action = True
+                else:
+                    return _benchmark_missing_script_message(bpath)
+            else:
+                return _benchmark_missing_script_message(bpath)
+
         elif kind == "static_source_defect":
             if n in {"supervisor_status", "supervisor_resume", "get_studio_state", "list_roblox_studios"}:
                 # Studio discovery is a safe recovery action. Static source debt
@@ -4230,19 +4314,40 @@ def on_tool_result(name: str, args: dict[str, Any] | None, response: dict[str, A
 
     # Special failure already observed: script_read path error while Play/unknown.
     if n == "script_read" and "script not found at path" in low:
-        def sr_fail(state: dict[str, Any]):
-            state["current_blocker"] = {
-                "classification": "script_read_not_found",
-                "path": extract_target(args),
-                "line": 0,
-                "message": "script_read reported Script not found at path",
-                "stage": "need_studio_state",
-                "created_at": time.time(),
-            }
-        state_update(sr_fail)
-        notes.append(
-            "Do not assume the path is wrong yet. Check get_studio_state first; if Studio is in Play mode, stop Play and retry the same script_read."
+        missing_target = extract_target(args)
+        with _state_lock:
+            known_mode = str(STATE.get("studio_mode") or "")
+        benchmark_missing = (
+            known_mode == "edit"
+            and "__QWEN_SCRIPT_BENCH__" in missing_target
         )
+
+        def sr_fail(state: dict[str, Any]):
+            if benchmark_missing:
+                state["current_blocker"] = {
+                    "classification": "benchmark_script_missing",
+                    "path": missing_target,
+                    "line": 0,
+                    "message": "benchmark script_read confirmed Script not found in Edit mode",
+                    "stage": "need_create_bootstrap",
+                    "created_at": time.time(),
+                }
+            else:
+                state["current_blocker"] = {
+                    "classification": "script_read_not_found",
+                    "path": missing_target,
+                    "line": 0,
+                    "message": "script_read reported Script not found at path",
+                    "stage": "need_studio_state",
+                    "created_at": time.time(),
+                }
+        state_update(sr_fail)
+        if benchmark_missing:
+            notes.append(_benchmark_missing_script_message(missing_target))
+        else:
+            notes.append(
+                "Do not assume the path is wrong yet. Check get_studio_state first; if Studio is in Play mode, stop Play and retry the same script_read."
+            )
 
     # Resolve script_read_not_found diagnostic gate deterministically.
     if n == "get_studio_state":
@@ -4262,6 +4367,23 @@ def on_tool_result(name: str, args: dict[str, Any] | None, response: dict[str, A
                     state["current_blocker"] = None
                 state_update(ready_retry)
                 notes.append("Studio is not in Play mode; retry the same script_read before changing the path.")
+
+    # A controller-approved benchmark bootstrap creation resolves the missing-script
+    # blocker, but the new Script is still uncached; script_read remains mandatory.
+    if n == "create_instances" and not is_error:
+        with _state_lock:
+            missing_blocker = copy.deepcopy(STATE.get("current_blocker"))
+        if (
+            isinstance(missing_blocker, dict)
+            and missing_blocker.get("classification") == "benchmark_script_missing"
+            and _benchmark_missing_script_create_matches(args, str(missing_blocker.get("path") or ""))
+        ):
+            created_path = str(missing_blocker.get("path") or "")
+            state_update(lambda state: state.__setitem__("current_blocker", None))
+            notes.append(
+                f"Benchmark bootstrap Script created at {created_path}. MANDATORY NEXT: script_read that exact path; "
+                "do not multi_edit until the authoritative bootstrap source is cached."
+            )
 
     if n == "start_stop_play" and args.get("is_start") is False and not is_error:
         with _state_lock:
@@ -5949,6 +6071,56 @@ def self_test_main() -> int:
     latest_run, latest_events = _latest_verified_benchmark_events(fake_rows)
     if latest_run != "new-run" or latest_events != ["[BENCH:S013:PASS]"]:
         failures.append(f"V6.3.17 benchmark run scoping failed: {latest_run!r} {latest_events!r}")
+
+    # V6.3.18 regression: a benchmark Script proven missing in confirmed Edit mode
+    # has one deterministic recovery: exact create_instances bootstrap, then reread.
+    missing_target = "ServerScriptService.__QWEN_SCRIPT_BENCH__.SP02_ScriptingTests"
+    correct_bootstrap_create = {
+        "instances": [{
+            "className": "Script",
+            "name": "SP02_ScriptingTests",
+            "parent": "ServerScriptService.__QWEN_SCRIPT_BENCH__",
+            "properties": {"Source": SCRIPT_BOOTSTRAP_SOURCE},
+        }]
+    }
+    if not _benchmark_missing_script_create_matches(correct_bootstrap_create, missing_target):
+        failures.append("V6.3.18 exact benchmark bootstrap creation was not recognized")
+    wrong_bootstrap_create = {
+        "instances": [{
+            "className": "Script",
+            "name": "WrongName",
+            "parent": "ServerScriptService.__QWEN_SCRIPT_BENCH__",
+            "properties": {"Source": SCRIPT_BOOTSTRAP_SOURCE},
+        }]
+    }
+    if _benchmark_missing_script_create_matches(wrong_bootstrap_create, missing_target):
+        failures.append("V6.3.18 wrong benchmark Script creation incorrectly matched missing target")
+    benchmark_missing_state = new_state()
+    benchmark_missing_state["studio_mode"] = "edit"
+    benchmark_missing_state["current_blocker"] = {
+        "classification": "benchmark_script_missing",
+        "path": missing_target,
+        "stage": "need_create_bootstrap",
+        "message": "missing",
+    }
+    with _state_lock:
+        saved_state_6318 = copy.deepcopy(STATE)
+        STATE.clear()
+        STATE.update(copy.deepcopy(benchmark_missing_state))
+    try:
+        allowed_reason = block_reason_for_call("create_instances", correct_bootstrap_create)
+        if allowed_reason:
+            failures.append(f"V6.3.18 exact bootstrap creation was blocked: {allowed_reason!r}")
+        bad_edit_reason = block_reason_for_call(
+            "multi_edit",
+            {"file_path": missing_target, "edits": [{"old_string": "", "new_string": "print(1)"}]},
+        )
+        if not bad_edit_reason or "create_instances" not in bad_edit_reason:
+            failures.append(f"V6.3.18 nonexistent benchmark multi_edit lacked create guidance: {bad_edit_reason!r}")
+    finally:
+        with _state_lock:
+            STATE.clear()
+            STATE.update(saved_state_6318)
 
     # V6.3.14 regression: after a benchmark target is known, pathless whole-tree
     # enumeration is blocked to avoid multi-thousand-token prompt explosions.
