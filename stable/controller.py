@@ -39,8 +39,8 @@ import urllib.request
 from pathlib import Path
 from typing import Any
 
-APP_NAME = "Qwen Roblox Enforced Proxy V6.3.22"
-VERSION = "6.3.22"
+APP_NAME = "Qwen Roblox Enforced Proxy V6.3.23"
+VERSION = "6.3.23"
 
 LOCALAPPDATA = Path(os.environ.get("LOCALAPPDATA", str(Path.home())))
 STATE_DIR = LOCALAPPDATA / "QwenRobloxEnforcedProxy"
@@ -65,6 +65,7 @@ TELEMETRY_HEALTH_FILE = TELEMETRY_DIR / "controller_health.json"
 TELEMETRY_TEST_RESULTS_FILE = TELEMETRY_DIR / "test_results.json"
 TELEMETRY_AUTOPILOT_FILE = TELEMETRY_DIR / "autopilot_runs.jsonl"
 TELEMETRY_QWEN_PERFORMANCE_FILE = TELEMETRY_DIR / "qwen_performance_history.jsonl"
+TELEMETRY_QWEN_DECISION_TRACE_FILE = TELEMETRY_DIR / "qwen_decision_trace.jsonl"
 TELEMETRY_FAILURE_PACKET_FILE = TELEMETRY_DIR / "failure_packet.json"
 TELEMETRY_REGRESSION_CASES_FILE = TELEMETRY_DIR / "regression_cases.jsonl"
 TELEMETRY_GITHUB_REPORTER_FILE = TELEMETRY_DIR / "github_reporter_status.json"
@@ -130,6 +131,7 @@ TELEMETRY_MAX_STRING = int(os.environ.get("QWEN_TELEMETRY_MAX_STRING", "12000"))
 TELEMETRY_HISTORY_TAIL = int(os.environ.get("QWEN_TELEMETRY_HISTORY_TAIL", "30"))
 QWEN_PERF_SAMPLER_INTERVAL = max(0.25, float(os.environ.get("QWEN_PERF_SAMPLER_INTERVAL", "1.0")))
 QWEN_PERF_HISTORY_TAIL = max(5, min(60, int(os.environ.get("QWEN_PERF_HISTORY_TAIL", "20"))))
+QWEN_DECISION_TRACE_TAIL = max(4, min(30, int(os.environ.get("QWEN_DECISION_TRACE_TAIL", "12"))))
 BENCHMARK_EVENT_HISTORY_ROWS = max(
     400,
     min(5000, int(os.environ.get("QWEN_BENCHMARK_EVENT_HISTORY_ROWS", "1200"))),
@@ -1036,6 +1038,32 @@ def _public_failure_row(row: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _public_qwen_decision_row(row: dict[str, Any]) -> dict[str, Any]:
+    state = row.get("controller_state") if isinstance(row.get("controller_state"), dict) else {}
+    return {
+        "at": row.get("at"),
+        "source": "qwen_structured_summary",
+        "goal": _public_safe_string(row.get("goal"), 500),
+        "evidence": [_public_safe_string(x, 350) for x in list(row.get("evidence") or [])[-8:]],
+        "decision": _public_safe_string(row.get("decision"), 800),
+        "expected_result": _public_safe_string(row.get("expected_result"), 500),
+        "actual_result": _public_safe_string(row.get("actual_result"), 500),
+        "next_action": _public_safe_string(row.get("next_action"), 500),
+        "confidence": _public_safe_string(row.get("confidence"), 20),
+        "blocker": _public_safe_string(row.get("blocker"), 500),
+        "controller_state": {
+            "studio_mode": _public_safe_string(state.get("studio_mode"), 40),
+            "play_session": state.get("play_session"),
+            "mutation_epoch": state.get("mutation_epoch"),
+            "last_script_target": _public_safe_string(state.get("last_script_target"), 300),
+            "gate": _telemetry_sanitize(state.get("gate")),
+            "blocker": _telemetry_sanitize(state.get("blocker")),
+            "next_required_action": _public_safe_string(state.get("next_required_action"), 700),
+            "last_action": _telemetry_sanitize(state.get("last_action")),
+        },
+    }
+
+
 def _safe_autopilot_log_tail() -> list[str]:
     install_dir = LOCALAPPDATA / "QwenRobloxAgent"
     candidates = [
@@ -1644,6 +1672,7 @@ def _diagnostic_snapshot() -> dict[str, Any]:
     action_rows = _tail_jsonl_safe(TELEMETRY_ACTION_HISTORY_FILE, GITHUB_HEARTBEAT_ACTION_TAIL)
     failure_rows = _tail_jsonl_safe(TELEMETRY_FAILURE_HISTORY_FILE, GITHUB_HEARTBEAT_FAILURE_TAIL)
     qwen_perf_rows = _tail_jsonl_safe(TELEMETRY_QWEN_PERFORMANCE_FILE, QWEN_PERF_HISTORY_TAIL)
+    qwen_decision_rows = _tail_jsonl_safe(TELEMETRY_QWEN_DECISION_TRACE_FILE, QWEN_DECISION_TRACE_TAIL)
 
     with _state_lock:
         state = copy.deepcopy(STATE)
@@ -1710,6 +1739,7 @@ def _diagnostic_snapshot() -> dict[str, Any]:
             ),
         },
         "recent_actions": [_public_action_row(x) for x in action_rows],
+        "qwen_decision_trace": [_public_qwen_decision_row(x) for x in qwen_decision_rows],
         "recent_failures": [_public_failure_row(x) for x in failure_rows],
         "recent_autopilot_events": displayed_autopilot_events,
         "benchmark_progress": benchmark_progress,
@@ -1718,6 +1748,10 @@ def _diagnostic_snapshot() -> dict[str, Any]:
                 "Only metadata/events already written to local logs are published here. "
                 "Raw prompts, raw completions, Roblox source, and arbitrary tool arguments are intentionally omitted "
                 "because the configured GitHub repository may be public."
+            ),
+            "structured_decision_trace": (
+                "qwen_decision_trace contains short Qwen-authored operational summaries: goal, evidence, decision, expected result, "
+                "next action, confidence, and controller state. It is deliberately not hidden chain-of-thought."
             ),
             "hidden_reasoning": (
                 "Hidden model chain-of-thought is not available to the controller and is never claimed to be captured. "
@@ -1762,6 +1796,7 @@ def _heartbeat_issue_body(snapshot: dict[str, Any]) -> str:
     if len(body) > GITHUB_HEARTBEAT_MAX_BODY:
         smaller = copy.deepcopy(snapshot)
         smaller["recent_actions"] = list(smaller.get("recent_actions") or [])[-20:]
+        smaller["qwen_decision_trace"] = list(smaller.get("qwen_decision_trace") or [])[-6:]
         smaller["recent_autopilot_events"] = list(smaller.get("recent_autopilot_events") or [])[-20:]
         smaller["recent_failures"] = list(smaller.get("recent_failures") or [])[-5:]
         body_json = json.dumps(smaller, ensure_ascii=False, indent=2, default=str)
@@ -5141,6 +5176,111 @@ SUPERVISOR_RESUME_TOOL = {
 }
 
 
+SUPERVISOR_DECISION_TRACE_TOOL = {
+    "name": "supervisor_decision_trace",
+    "description": (
+        "Record a concise observable Qwen decision summary for remote debugging. "
+        "This is NOT hidden chain-of-thought. Use short operational fields: current goal, evidence considered, "
+        "decision, expected result, next action, and confidence. Call it when strategy changes, before a mutation/play/benchmark "
+        "commit, or after an error changes the plan; do not spam it for routine reads."
+    ),
+    "inputSchema": {
+        "type": "object",
+        "required": ["goal", "decision", "next_action"],
+        "properties": {
+            "goal": {"type": "string"},
+            "evidence": {
+                "type": "array",
+                "maxItems": 8,
+                "items": {"type": "string"},
+            },
+            "decision": {"type": "string"},
+            "expected_result": {"type": "string"},
+            "actual_result": {"type": "string"},
+            "next_action": {"type": "string"},
+            "confidence": {"type": "string", "enum": ["low", "medium", "high"]},
+            "blocker": {"type": "string"},
+        },
+        "additionalProperties": False,
+    },
+}
+
+
+def _validate_qwen_decision_trace(args: dict[str, Any]) -> tuple[dict[str, Any] | None, str | None]:
+    raw = args or {}
+    goal = str(raw.get("goal") or "").strip()
+    decision = str(raw.get("decision") or "").strip()
+    next_action = str(raw.get("next_action") or "").strip()
+    if not goal:
+        return None, "decision trace requires a non-empty goal."
+    if not decision:
+        return None, "decision trace requires a non-empty decision."
+    if not next_action:
+        return None, "decision trace requires a non-empty next_action."
+
+    confidence = str(raw.get("confidence") or "medium").strip().lower()
+    if confidence not in {"low", "medium", "high"}:
+        return None, "confidence must be low, medium, or high."
+
+    evidence_raw = raw.get("evidence")
+    if evidence_raw is None:
+        evidence_raw = []
+    if not isinstance(evidence_raw, list) or len(evidence_raw) > 8:
+        return None, "evidence must be an array with at most 8 short items."
+
+    def clean(value: Any, limit: int) -> str:
+        return _public_safe_string(str(value or "").replace("\r", " ").replace("\n", " "), limit)
+
+    payload = {
+        "goal": clean(goal, 500),
+        "evidence": [clean(x, 350) for x in evidence_raw if str(x or "").strip()],
+        "decision": clean(decision, 800),
+        "expected_result": clean(raw.get("expected_result"), 500),
+        "actual_result": clean(raw.get("actual_result"), 500),
+        "next_action": clean(next_action, 500),
+        "confidence": confidence,
+        "blocker": clean(raw.get("blocker"), 500),
+    }
+    return payload, None
+
+
+def _record_qwen_decision_trace(args: dict[str, Any]) -> tuple[dict[str, Any] | None, str | None]:
+    payload, reason = _validate_qwen_decision_trace(args)
+    if reason or payload is None:
+        return None, reason or "invalid decision trace."
+
+    with _state_lock:
+        state = copy.deepcopy(STATE)
+    history = list(state.get("action_history") or [])
+    row = {
+        "schema_version": TELEMETRY_SCHEMA_VERSION,
+        "at": time.time(),
+        "controller_version": VERSION,
+        "source": "qwen_structured_summary",
+        **payload,
+        "controller_state": {
+            "studio_mode": state.get("studio_mode"),
+            "play_session": state.get("play_session", 0),
+            "mutation_epoch": state.get("mutation_epoch", 0),
+            "last_script_target": _public_safe_string(state.get("last_script_target"), 300),
+            "gate": _public_gate(state.get("gate")),
+            "blocker": _public_blocker(state.get("current_blocker")),
+            "next_required_action": _public_safe_string(next_required_action_from_state(state), 700),
+            "last_action": _public_action_row(history[-1]) if history else None,
+        },
+    }
+    try:
+        with _telemetry_lock:
+            _append_jsonl(TELEMETRY_QWEN_DECISION_TRACE_FILE, row)
+    except Exception as exc:
+        return None, f"Could not persist Qwen decision trace: {exc!r}"
+    return {
+        "accepted": True,
+        "at": row["at"],
+        "trace_file": str(TELEMETRY_QWEN_DECISION_TRACE_FILE),
+    }, None
+
+
 SUPERVISOR_BENCHMARK_RECORD_TOOL = {
     "name": "supervisor_benchmark_record",
     "description": (
@@ -5257,6 +5397,8 @@ def augment_tools_list(response: dict[str, Any]) -> dict[str, Any]:
             tools.append(SUPERVISOR_STATUS_TOOL)
         if "supervisor_resume" not in seen:
             tools.append(SUPERVISOR_RESUME_TOOL)
+        if "supervisor_decision_trace" not in seen:
+            tools.append(SUPERVISOR_DECISION_TRACE_TOOL)
         if "supervisor_benchmark_record" not in seen:
             tools.append(SUPERVISOR_BENCHMARK_RECORD_TOOL)
         return response
@@ -5300,6 +5442,7 @@ def status_payload() -> dict[str, Any]:
         "telemetry_test_results_file": str(TELEMETRY_TEST_RESULTS_FILE),
         "github_heartbeat_status_file": str(TELEMETRY_GITHUB_HEARTBEAT_FILE),
         "diagnostic_snapshot_file": str(TELEMETRY_DIAGNOSTIC_SNAPSHOT_FILE),
+        "qwen_decision_trace_file": str(TELEMETRY_QWEN_DECISION_TRACE_FILE),
         "model_updater_bootstrap_file": str(TELEMETRY_MODEL_UPDATER_BOOTSTRAP_FILE),
         "controller_health": controller_health_payload(),
         "important": (
@@ -5619,6 +5762,14 @@ def handle_parent_message(child: subprocess.Popen[str], message: dict[str, Any])
             if "id" in message:
                 emit(mcp_tool_ok_response(request_id, packet))
             return
+        if name == "supervisor_decision_trace":
+            payload, trace_reason = _record_qwen_decision_trace(args)
+            if "id" in message:
+                if trace_reason:
+                    emit(mcp_tool_error_response(request_id, trace_reason))
+                else:
+                    emit(mcp_tool_ok_response(request_id, payload))
+            return
         if name == "supervisor_benchmark_record":
             payload, record_reason = _record_benchmark_submission(args)
             if "id" in message:
@@ -5682,6 +5833,9 @@ AUTOPILOT_SYSTEM_PROMPT = """You are Qwen operating Roblox Studio through the ma
 The controller is your executive function and the official Roblox Studio MCP is your hands.
 Work autonomously and prefer tool evidence over speculation.
 Follow every SUPERVISOR BLOCK/NEXT instruction literally.
+Maintain a concise observable decision trace with supervisor_decision_trace. This is an operational summary, not private chain-of-thought.
+Call supervisor_decision_trace when strategy changes, before a mutation/play/benchmark commit, or after an error changes the plan; do not spam routine reads.
+Preserve completed benchmark harness Script/LocalScript/ModuleScript objects for later inspection; temporary runtime objects may still be cleaned up for isolation.
 Do not repeatedly explain plans or re-inspect evidence already stored by the controller.
 Current Studio/source/controller state is authoritative, not previous narration.
 In a fresh API chat, call supervisor_resume with new_chat=true before continuing.
@@ -6441,6 +6595,33 @@ def self_test_main() -> int:
             f"V6.3.16 bootstrap no-op was not deterministically blocked: "
             f"candidate={noop_candidate!r} reason={noop_reason!r}"
         )
+
+    # V6.3.23 regression: Qwen decision summaries are structured, bounded, and explicit.
+    valid_trace, valid_trace_reason = _validate_qwen_decision_trace({
+        "goal": "Verify current benchmark pack",
+        "evidence": ["authoritative reread matches expected harness", "controller gate is clear"],
+        "decision": "Proceed to the required playtest",
+        "expected_result": "Output has no relevant runtime errors",
+        "next_action": "start Play once",
+        "confidence": "high",
+    })
+    if valid_trace_reason or not valid_trace or valid_trace.get("confidence") != "high":
+        failures.append(f"V6.3.23 valid decision trace rejected: {valid_trace_reason!r} {valid_trace!r}")
+    _, missing_trace_reason = _validate_qwen_decision_trace({
+        "goal": "x",
+        "decision": "",
+        "next_action": "y",
+    })
+    if not missing_trace_reason or "non-empty decision" not in missing_trace_reason:
+        failures.append(f"V6.3.23 empty decision trace was not rejected: {missing_trace_reason!r}")
+    _, confidence_trace_reason = _validate_qwen_decision_trace({
+        "goal": "x",
+        "decision": "y",
+        "next_action": "z",
+        "confidence": "certain",
+    })
+    if not confidence_trace_reason or "low, medium, or high" not in confidence_trace_reason:
+        failures.append(f"V6.3.23 invalid decision confidence was not rejected: {confidence_trace_reason!r}")
 
     # V6.3.17 regression: structured benchmark records are run-scoped and pack
     # completion cannot be declared until every capability in the pack is decided.
