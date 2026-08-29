@@ -1549,7 +1549,15 @@ def _validate_benchmark_record_request(
 
     events = list(existing_events or []) + markers
     progress = _benchmark_progress_from_events(events)
-    decided = set(progress.get("results") or {})
+
+    # Validation must use the complete run event set. benchmark_progress.results
+    # is intentionally truncated for heartbeat display, so it cannot be the
+    # authority for large-suite completeness checks.
+    decided: set[str] = set()
+    for event in events:
+        match = _BENCH_MARKER_RE.fullmatch(str(event or "").strip())
+        if match:
+            decided.add(match.group(1).upper())
 
     required_by_pack = {
         "SP01": {f"S{i:03d}" for i in range(1, 13)},
@@ -1588,7 +1596,6 @@ def _validate_benchmark_record_request(
         progress = _benchmark_progress_from_events(events)
 
     if batch:
-        decided = set(progress.get("results") or {})
         completed_packs = {str(x).upper() for x in (progress.get("pack_complete_markers") or [])}
 
         if batch.startswith("scripting-s001-s024-"):
