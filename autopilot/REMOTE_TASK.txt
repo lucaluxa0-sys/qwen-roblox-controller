@@ -1,31 +1,20 @@
-Task-Instance: sp07-b-create-now-20260829T1110Z
+Task-Instance: hold-sp07-for-class-aware-controller-6.3.27-20260829T1113Z
 Benchmark-Run-ID: scripting-s001-s024-structured-run6-20260829T0806Z
 
-IGNORE ALL PRIOR HOLD TASKS. CONTROLLER 6.3.26 IS LIVE AND VERIFIED. CONTINUE SP07 NOW.
+PAUSE SP07 UNTIL CONTROLLER 6.3.27 IS LIVE.
 
-CURRENT ACTIVE CONTROLLER BLOCKER IS AUTHORITATIVE:
-ServerScriptService.__QWEN_SCRIPT_BENCH__.SP07_B is confirmed missing in Edit mode and stage=need_create_bootstrap.
+Reason: the old missing-path multi_edit fallback can create a normal Script when the benchmark requires ModuleScript. 6.3.27 adds an explicit intended_script_class field to supervisor_decision_trace and blocks wrong-class creation deterministically.
 
-DO NOT inspect anything.
-DO NOT call search_game_tree.
-DO NOT read SP01-SP06.
+DO NOT call Roblox Studio tools.
 DO NOT call supervisor_benchmark_record.
+DO NOT mutate anything.
 
-EXACT ACTIONS ONLY:
-1. Call supervisor_decision_trace:
-   goal="Create missing SP07_B ModuleScript bootstrap"
-   evidence=["controller 6.3.26 confirms exact SP07_B path is missing in Edit mode","SP07_B intended class is ModuleScript"]
-   decision="Create exactly one ModuleScript named SP07_B with inert controller bootstrap source"
-   expected_result="SP07_B exists as ModuleScript with exact bootstrap source"
-   next_action="create_instances exactly once"
+ONLY:
+1. supervisor_decision_trace:
+   goal="Hold SP07 until class-aware benchmark creation controller is live"
+   evidence=["SP07 ModuleScripts require exact class preservation","controller 6.3.27 is pending activation"]
+   decision="Stop without changing Studio"
+   next_action="await fresh recovery task after heartbeat proves 6.3.27 live"
    confidence="high"
-2. Call create_instances exactly once with one instance:
-   className="ModuleScript"
-   name="SP07_B"
-   parent="ServerScriptService.__QWEN_SCRIPT_BENCH__"
-   properties.Source="-- QWEN_CONTROLLER_SCRIPT_BOOTSTRAP"
-3. Call script_read exactly:
-   ServerScriptService.__QWEN_SCRIPT_BENCH__.SP07_B
-4. If reread succeeds and bootstrap matches, emit [TASK_COMPLETE] and STOP.
-
-No other Roblox tool call. Preserve every existing harness.
+2. Emit [TASK_COMPLETE]
+3. Stop.
