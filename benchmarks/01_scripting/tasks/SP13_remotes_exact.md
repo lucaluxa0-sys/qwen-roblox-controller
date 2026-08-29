@@ -154,9 +154,9 @@ local request = Instance.new("RemoteFunction")
 request.Name = "Request"
 request.Parent = runtimeRoot
 
-local oldAllowed = workspace:FindFirstChild("__QWEN_SP13_ALLOWED_PART__")
-if oldAllowed then
-	oldAllowed:Destroy()
+local oldAllowedRoot = workspace:FindFirstChild("__QWEN_SP13_ALLOWED_ROOT__")
+if oldAllowedRoot then
+	oldAllowedRoot:Destroy()
 end
 
 local allowedRoot = Instance.new("Folder")
@@ -450,4 +450,9 @@ runTest("S178", function()
 end)
 
 print("[SP13] COMPLETE")
+
+eventConnection:Disconnect()
+runtimeRoot:Destroy()
+allowedRoot:Destroy()
+secret:Destroy()
 ```
