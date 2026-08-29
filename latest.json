@@ -1,11 +1,11 @@
 {
   "schema_version": 1,
-  "version": "6.3.29",
+  "version": "6.3.30",
   "channel": "stable",
-  "controller_path": "releases/6.3.29/controller.py",
-  "release_path": "releases/6.3.29/controller.py",
-  "sha256": "9e9beca96eb0e053a5e64b41799adc06f9ac24564a7931032e4a3f959e4f7b43",
-  "published_at": "2026-08-29T11:49:21Z",
-  "notes": "Adds one deterministic execute_luau fallback solely for a controller-proven-missing benchmark ModuleScript/LocalScript with an exact declared class/path and inert bootstrap Source; arbitrary Script.Source creation and rewriting remain blocked. Also tells autopilot to execute exact immediate tool instructions before prose or alternatives.",
-  "url": "https://raw.githubusercontent.com/lucaluxa0-sys/qwen-roblox-controller/main/releases/6.3.29/controller.py"
+  "controller_path": "releases/6.3.30/controller.py",
+  "release_path": "releases/6.3.30/controller.py",
+  "sha256": "cda4367d95b593c31e7831fdb39224ab7f033d1f8a062a1c36728d713e06db39",
+  "published_at": "2026-08-29T12:38:00Z",
+  "notes": "Adds an explicit user-authorized supervisor_stop_local_qwen_stack command that stops the full-auto manager, autonomous runner, and LM Studio llama-server backend while preserving Roblox Studio and the LM Studio GUI.",
+  "url": "https://raw.githubusercontent.com/lucaluxa0-sys/qwen-roblox-controller/main/releases/6.3.30/controller.py"
 }
