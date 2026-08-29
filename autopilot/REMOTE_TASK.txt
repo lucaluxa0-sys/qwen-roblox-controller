@@ -1,69 +1,145 @@
-Task-Instance: scripting-s001-s024-structured-run6-resume-sp02-v620-20260829T0830Z
+Task-Instance: scripting-s001-s024-structured-run6-sp02-exact-harness-20260829T0835Z
 Benchmark-Run-ID: scripting-s001-s024-structured-run6-20260829T0806Z
-These IDs are metadata only. NEVER use them as studio_id.
+IDs are metadata only; never use them as studio_id.
 
-RESUME RUN6 — SP01 IS DONE.
-Controller-verified progress is authoritative:
-- S001-S012 PASS
-- tests_seen=12
-- pack_complete=SP01
-Do not touch, reread, rerun, or rereport SP01.
+RESUME RUN6. SP01 S001-S012 is controller-verified DONE. Do not touch or rereport SP01.
 
-LIVE CONTROLLER: 6.3.20.
+LIVE CONTROLLER: 6.3.20
+ONLY GOAL: finish SP02 S013-S024, cleanup, batch-complete.
 
-ONLY GOAL: finish SP02 S013-S024, clean up, and complete this same run.
-
-EXACT TARGET:
+TARGET:
 ServerScriptService.__QWEN_SCRIPT_BENCH__.SP02_ScriptingTests
 
-AUTHORITATIVE CURRENT STATE:
-- SP02 Script has now been created successfully by official multi_edit.
-- Immediate authoritative script_read succeeded.
-- Current source is EXACTLY:
+AUTHORITATIVE STATE:
+The target exists and its authoritative source is exactly:
 -- QWEN_CONTROLLER_SCRIPT_BOOTSTRAP
-- Do NOT create it again.
-- Do NOT use create_instances.
-- Do NOT use execute_luau for Script creation or Source assignment.
 
-MANDATORY NEXT ACTION:
-Use ONE transactional multi_edit on the exact target with:
-old_string EXACTLY:
--- QWEN_CONTROLLER_SCRIPT_BOOTSTRAP
-new_string:
-the complete real SP02 harness for S013-S024.
-Do not use any larger/stale old_string.
-Then immediately script_read the exact target and treat that reread as authoritative.
+Do not create it again. Do not use create_instances. Do not use execute_luau to assign Source.
 
-SP02:
-S013 local scope/no accidental globals
-S014 block shadowing
-S015 nil-safe missing child
-S016 false vs nil
-S017 typeof and IsA
-S018 optional-value guard
-S019 named constants
-S020 multiple assignment/returns
-S021 lexical closure mutation
-S022 stale Instance reference after destroy/recreate
-S023 string/number conversion validation
-S024 declaration-order/closure repair
+MANDATORY:
+1. script_read target once if controller cache requires it.
+2. multi_edit target with old_string EXACTLY "-- QWEN_CONTROLLER_SCRIPT_BOOTSTRAP" and new_string EXACTLY the harness between HARNESS_START/HARNESS_END below.
+3. Do not rewrite, improvise, shorten, or add syntax to the harness.
+4. Immediately script_read target.
+5. Start Play once, read Output once, stop Play.
+6. Use Output evidence for S013-S024.
+7. Call supervisor_benchmark_record once with exactly S013-S024 and pack_complete=["SP02"].
+8. Require tests_seen=24 and both SP01/SP02 markers.
+9. Remove all benchmark-created artifacts under ServerScriptService.__QWEN_SCRIPT_BENCH__, verify cleanup.
+10. Call supervisor_benchmark_record with batch_complete="scripting-s001-s024-structured-run6-20260829T0806Z".
+11. Emit [TASK_COMPLETE] only after batch marker accepted and gate clear.
 
-After authoritative reread, Play/Output verify SP02 once efficiently.
+HARNESS_START
+local function runTest(id, fn)
+	local ok, err = pcall(fn)
+	if ok then
+		print("[SP02] " .. id .. " PASS")
+	else
+		warn("[SP02] " .. id .. " FAIL: " .. tostring(err))
+	end
+end
 
-Then call supervisor_benchmark_record ONCE:
-run_id="scripting-s001-s024-structured-run6-20260829T0806Z"
-results=exactly S013-S024 with evidence-based PASS/PARTIAL/FAIL reasons
-pack_complete=["SP02"]
+runTest("S013", function()
+	local scopedValue = 13
+	assert(scopedValue == 13)
+end)
 
-Require controller benchmark_progress:
-- tests_seen=24
-- SP01 and SP02 present
+runTest("S014", function()
+	local value = 1
+	do
+		local value = 2
+		assert(value == 2)
+	end
+	assert(value == 1)
+end)
 
-Then remove benchmark artifacts under ServerScriptService.__QWEN_SCRIPT_BENCH__, verify cleanup, and call supervisor_benchmark_record with:
-run_id="scripting-s001-s024-structured-run6-20260829T0806Z"
-batch_complete="scripting-s001-s024-structured-run6-20260829T0806Z"
+runTest("S015", function()
+	local missing = script:FindFirstChild("__QWEN_SP02_MISSING__")
+	assert(missing == nil)
+end)
 
-Only emit [TASK_COMPLETE] after the controller accepts the batch marker and gate is clear.
+runTest("S016", function()
+	local falseValue = false
+	local nilValue = nil
+	assert(falseValue == false)
+	assert(falseValue ~= nil)
+	assert(nilValue == nil)
+end)
 
-EFFICIENCY:
-No pathless search_game_tree. No repeated identical mutation. If studio_id is stale, list_roblox_studios once and continue from the same verified state.
+runTest("S017", function()
+	local folder = Instance.new("Folder")
+	assert(typeof(folder) == "Instance")
+	assert(folder:IsA("Folder"))
+	folder:Destroy()
+end)
+
+runTest("S018", function()
+	local function addOne(value)
+		if value == nil then
+			return 0
+		end
+		return value + 1
+	end
+	assert(addOne(nil) == 0)
+	assert(addOne(4) == 5)
+end)
+
+runTest("S019", function()
+	local MAX_COUNT = 4
+	local count = 4
+	assert(count <= MAX_COUNT)
+end)
+
+runTest("S020", function()
+	local function pair()
+		return 2, 3
+	end
+	local a, b = pair()
+	assert(a == 2 and b == 3)
+end)
+
+runTest("S021", function()
+	local count = 0
+	local function increment()
+		count += 1
+	end
+	increment()
+	increment()
+	assert(count == 2)
+end)
+
+runTest("S022", function()
+	local oldInstance = Instance.new("Folder")
+	oldInstance.Name = "__QWEN_SP02_STALE__"
+	oldInstance.Parent = script
+	oldInstance:Destroy()
+	local freshInstance = Instance.new("Folder")
+	freshInstance.Name = "__QWEN_SP02_STALE__"
+	freshInstance.Parent = script
+	assert(oldInstance ~= freshInstance)
+	assert(oldInstance.Parent == nil)
+	assert(freshInstance.Parent == script)
+	freshInstance:Destroy()
+end)
+
+runTest("S023", function()
+	assert(tonumber("42") == 42)
+	assert(tonumber("not-a-number") == nil)
+	assert(tostring(42) == "42")
+end)
+
+runTest("S024", function()
+	local helper
+	local function callHelper()
+		return helper()
+	end
+	helper = function()
+		return 24
+	end
+	assert(callHelper() == 24)
+end)
+
+print("[SP02] COMPLETE")
+HARNESS_END
+
+If multi_edit is blocked, obey the controller's exact defect message and make only the smallest syntax correction to THIS harness. Never retry an identical blocked proposal.
