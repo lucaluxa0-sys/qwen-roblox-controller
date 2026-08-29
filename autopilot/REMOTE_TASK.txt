@@ -1,29 +1,21 @@
-Task-Instance: sp07-create-four-modules-only-20260829T1051Z
+Task-Instance: hold-sp07-for-controller-6.3.25-20260829T1055Z
 Benchmark-Run-ID: scripting-s001-s024-structured-run6-20260829T0806Z
 
-SINGLE ACTION MICRO-TASK.
-Do NOT inspect anything. Do NOT read SP01-SP06. The SP07 parent folder and driver have already been inspected repeatedly and mutation_epoch is still 21, so no module creation occurred during the inspection loop.
+PAUSE SP07 ACTIONS UNTIL CONTROLLER 6.3.25 IS LIVE.
 
-Parent:
-ServerScriptService.__QWEN_SCRIPT_BENCH__
+Reason: controller 6.3.24 still routes a proven-missing benchmark path through Script-only recovery, while SP07 needs ModuleScript creation. Controller 6.3.25 fixes that safely.
 
-Create exactly these four missing ModuleScripts:
-- SP07_A
-- SP07_B
-- SP07_C
-- SP07_Function
+DO NOT call Roblox Studio tools.
+DO NOT call benchmark tools.
+DO NOT mutate anything.
+DO NOT inspect earlier packs.
 
-FLOW:
-1. Call supervisor_decision_trace with:
-   goal = "Create SP07 module graph bootstrap objects"
-   evidence = ["SP07 parent and driver already inspected; no module creation mutation occurred"]
-   decision = "Create the four required ModuleScripts in one create_instances call using inert controller bootstrap source"
-   expected_result = "Four visible ModuleScripts exist under the SP07 benchmark parent with exact bootstrap Source"
-   next_action = "create_instances once"
-   confidence = "high"
-2. Call create_instances ONCE. Create exactly four ModuleScript instances under ServerScriptService.__QWEN_SCRIPT_BENCH__. Each must have Source exactly:
--- QWEN_CONTROLLER_SCRIPT_BOOTSTRAP
-3. Do not perform any other Roblox tool call.
-4. Emit [TASK_COMPLETE] and stop.
-
-If the controller says any named module already exists, do not retry creation and do not delete it; stop with [TASK_COMPLETE] so the supervisor can inspect the result.
+ONLY ACTION:
+1. Call supervisor_decision_trace once:
+   goal="Hold SP07 until ModuleScript recovery controller is live"
+   evidence=["SP07 needs ModuleScript creation; controller 6.3.25 is pending activation"]
+   decision="Stop without changing Studio"
+   next_action="await a fresh SP07 continuation task after heartbeat proves 6.3.25 live"
+   confidence="high"
+2. Emit [TASK_COMPLETE]
+3. Stop immediately.
