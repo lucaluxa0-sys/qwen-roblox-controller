@@ -428,8 +428,8 @@ def next_required_action_from_state(state: dict[str, Any]) -> str:
             if mode == "play":
                 return f"Stop Play, then read {path}."
             return (
-                f"Read {path} to restore an authoritative source snapshot; if Studio targeting fails, "
-                "call list_roblox_studios to refresh studio_id and retry the same read. "
+                f"Call script_read on {path} to restore an authoritative source snapshot; if Studio targeting fails, "
+                "call list_roblox_studios to refresh studio_id and retry the same script_read. "
                 "Then make one narrow same-script repair that reduces the recorded defect debt and reread."
             )
         if stage == "need_evidence":
