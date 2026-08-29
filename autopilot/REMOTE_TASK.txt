@@ -1,24 +1,17 @@
-Task-Instance: user-stop-local-qwen-stack-20260829T0540PT
+Task-Instance: hold-for-stop-button-6.3.31-20260829T0542PT
 
-USER EXPLICITLY AUTHORIZED STOPPING THE CURRENT LOCAL QWEN/LM STUDIO BACKEND.
+USER WANTS A CLICKABLE STOP BUTTON INSTALLED BEFORE THE LOCAL QWEN STACK IS ENDED.
 
 DO NOT call Roblox Studio tools.
-DO NOT mutate Studio.
 DO NOT resume benchmarks.
+DO NOT call supervisor_stop_local_qwen_stack yet.
 
-1. Call supervisor_status.
-2. If controller version is older than 6.3.30:
-   - do not call any unknown tool.
-   - emit [TASK_COMPLETE] and stop this generation. The manager will restart the task after controller update.
-3. If controller version is 6.3.30 or newer:
-   - call supervisor_stop_local_qwen_stack with exactly:
-     confirm="STOP_LOCAL_QWEN_STACK"
-   - after the tool accepts the shutdown, emit [TASK_COMPLETE].
-   - do nothing else.
-
-Expected shutdown scope:
-- stop qwen_full_auto_manager.py
-- stop autonomous Qwen runner
-- stop LM Studio llama-server.exe backend
-- preserve Roblox Studio
-- preserve LM Studio GUI
+ONLY:
+1. If supervisor_decision_trace is available, record:
+   goal="Wait for clickable Stop Qwen button controller"
+   evidence=["user requested the stop button be installed before shutdown"]
+   decision="Do not shut down until controller 6.3.31 is live"
+   next_action="await updated task"
+   confidence="high"
+2. Emit [TASK_COMPLETE]
+3. Stop.
