@@ -1,9 +1,9 @@
-Task-Instance: hold-sp07-for-class-aware-controller-6.3.27-20260829T1113Z
+Task-Instance: hold-sp07-for-immutable-benchmark-6.3.28-20260829T1120Z
 Benchmark-Run-ID: scripting-s001-s024-structured-run6-20260829T0806Z
 
-PAUSE SP07 UNTIL CONTROLLER 6.3.27 IS LIVE.
+PAUSE SP07 UNTIL CONTROLLER 6.3.28 IS LIVE.
 
-Reason: the old missing-path multi_edit fallback can create a normal Script when the benchmark requires ModuleScript. 6.3.27 adds an explicit intended_script_class field to supervisor_decision_trace and blocks wrong-class creation deterministically.
+Reason: an already-decided capability reason was rewritten during a hold. 6.3.28 makes each S### decision fully immutable inside the active run.
 
 DO NOT call Roblox Studio tools.
 DO NOT call supervisor_benchmark_record.
@@ -11,10 +11,10 @@ DO NOT mutate anything.
 
 ONLY:
 1. supervisor_decision_trace:
-   goal="Hold SP07 until class-aware benchmark creation controller is live"
-   evidence=["SP07 ModuleScripts require exact class preservation","controller 6.3.27 is pending activation"]
-   decision="Stop without changing Studio"
-   next_action="await fresh recovery task after heartbeat proves 6.3.27 live"
+   goal="Hold SP07 until immutable benchmark evidence controller is live"
+   evidence=["S001-S080 are already decided and must remain immutable","controller 6.3.28 is pending activation"]
+   decision="Stop without changing Studio or benchmark telemetry"
+   next_action="await fresh SP07 recovery task after heartbeat proves 6.3.28 live"
    confidence="high"
 2. Emit [TASK_COMPLETE]
 3. Stop.
