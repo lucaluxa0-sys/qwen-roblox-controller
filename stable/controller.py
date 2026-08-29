@@ -39,8 +39,8 @@ import urllib.request
 from pathlib import Path
 from typing import Any
 
-APP_NAME = "Qwen Roblox Enforced Proxy V6.3.25"
-VERSION = "6.3.25"
+APP_NAME = "Qwen Roblox Enforced Proxy V6.3.26"
+VERSION = "6.3.26"
 
 LOCALAPPDATA = Path(os.environ.get("LOCALAPPDATA", str(Path.home())))
 STATE_DIR = LOCALAPPDATA / "QwenRobloxEnforcedProxy"
@@ -1456,6 +1456,7 @@ _BENCH_MARKER_RE = re.compile(
 _BENCH_BATCH_RE = re.compile(r"\[BENCH_BATCH_COMPLETE:([^\]]{1,160})\]", re.IGNORECASE)
 _BENCH_PACK_RE = re.compile(r"\[BENCH_PACK_COMPLETE:([^\]]{1,160})\]", re.IGNORECASE)
 _BENCH_RUN_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,159}$")
+_SCRIPTING_BENCH_RUN_ID_RE = re.compile(r"^scripting-s\d{3}-s\d{3}-[A-Za-z0-9][A-Za-z0-9._:-]{3,140}$", re.IGNORECASE)
 _BENCH_TEST_ID_RE = re.compile(r"^S\d{3}$", re.IGNORECASE)
 
 
@@ -1531,13 +1532,21 @@ def _benchmark_events_for_run(rows: list[dict[str, Any]], run_id: str) -> list[s
 
 
 def _latest_verified_benchmark_events(rows: list[dict[str, Any]]) -> tuple[str, list[str]]:
-    run_id = ""
+    # Prefer the latest canonical scripting-certification run whenever one
+    # exists. This prevents accidental object/path names (for example SP07_A)
+    # from displacing the real certification in heartbeat authority. Retain a
+    # generic fallback for controller self-tests and future non-scripting suites.
+    latest_any = ""
+    latest_scripting = ""
     for row in rows:
         if not isinstance(row, dict) or row.get("event_kind") != "benchmark_record":
             continue
         candidate = str(row.get("benchmark_run_id") or "").strip()
         if _BENCH_RUN_ID_RE.fullmatch(candidate):
-            run_id = candidate
+            latest_any = candidate
+        if _SCRIPTING_BENCH_RUN_ID_RE.fullmatch(candidate):
+            latest_scripting = candidate
+    run_id = latest_scripting or latest_any
     if not run_id:
         return "", []
     return run_id, _benchmark_events_for_run(rows, run_id)
@@ -1591,6 +1600,22 @@ def _validate_benchmark_record_request(
 
     events = list(existing_events or []) + markers
     progress = _benchmark_progress_from_events(events)
+
+    existing_progress = _benchmark_progress_from_events(list(existing_events or []))
+    existing_results = existing_progress.get("results") if isinstance(existing_progress, dict) else {}
+    if not isinstance(existing_results, dict):
+        existing_results = {}
+    for row in raw_results:
+        test_id = str(row.get("test_id") or "").upper().strip()
+        status = str(row.get("status") or "").upper().strip()
+        prior = existing_results.get(test_id)
+        if isinstance(prior, dict):
+            prior_status = str(prior.get("status") or "").upper().strip()
+            if prior_status and prior_status != status:
+                return [], (
+                    f"Refusing to rewrite existing controller-verified result {test_id} from {prior_status} to {status}. "
+                    "Use a new intentional benchmark run for a retest instead of mutating history."
+                )
 
     # Validation must use the complete run event set. benchmark_progress.results
     # is intentionally truncated for heartbeat display, so it cannot be the
@@ -5388,7 +5413,7 @@ SUPERVISOR_BENCHMARK_RECORD_TOOL = {
         "type": "object",
         "required": ["run_id"],
         "properties": {
-            "run_id": {"type": "string", "description": "Exact Benchmark-Run-ID from the task."},
+            "run_id": {"type": "string", "description": "Exact scripting Benchmark-Run-ID from the task; it must begin scripting-s###-s###- and must never be an object/path name."},
             "results": {
                 "type": "array",
                 "maxItems": 64,
@@ -5416,8 +5441,33 @@ SUPERVISOR_BENCHMARK_RECORD_TOOL = {
 }
 
 
+def _scripting_benchmark_submission_policy_reason(args: dict[str, Any]) -> str | None:
+    run_id = str((args or {}).get("run_id") or "").strip()
+    if not _SCRIPTING_BENCH_RUN_ID_RE.fullmatch(run_id):
+        return (
+            "This controller-owned benchmark reporter is currently scoped to the scripting certification. "
+            "Use the exact task Benchmark-Run-ID beginning with 'scripting-s###-s###-'; short object/path names such as SP07_A are not benchmark run IDs."
+        )
+    raw_results = (args or {}).get("results")
+    if raw_results is None:
+        raw_results = []
+    if isinstance(raw_results, list):
+        for row in raw_results:
+            if not isinstance(row, dict):
+                continue
+            test_id = str(row.get("test_id") or "").upper().strip()
+            if _BENCH_TEST_ID_RE.fullmatch(test_id):
+                test_number = int(test_id[1:])
+                if test_number < 1 or test_number > 280:
+                    return f"Invalid scripting capability {test_id}; expected S001-S280."
+    return None
+
+
 def _record_benchmark_submission(args: dict[str, Any]) -> tuple[dict[str, Any] | None, str | None]:
     run_id = str((args or {}).get("run_id") or "").strip()
+    policy_reason = _scripting_benchmark_submission_policy_reason(args or {})
+    if policy_reason:
+        return None, policy_reason
     rows = _tail_jsonl_safe(TELEMETRY_AUTOPILOT_FILE, BENCHMARK_EVENT_HISTORY_ROWS)
     existing = _benchmark_events_for_run(rows, run_id)
     markers, reason = _validate_benchmark_record_request(args or {}, existing)
@@ -6868,6 +6918,53 @@ def self_test_main() -> int:
     latest_run, latest_events = _latest_verified_benchmark_events(fake_rows)
     if latest_run != "new-run" or latest_events != ["[BENCH:S013:PASS]"]:
         failures.append(f"V6.3.17 benchmark run scoping failed: {latest_run!r} {latest_events!r}")
+
+    # V6.3.26 regression: benchmark run IDs are canonical scripting-run IDs,
+    # accidental object/path names cannot displace the real certification run,
+    # and scripting result IDs are constrained to S001-S280.
+    bad_run_reason_6326 = _scripting_benchmark_submission_policy_reason({
+        "run_id": "SP07_A",
+        "results": [{"test_id": "S007", "status": "PASS"}],
+    })
+    if not bad_run_reason_6326 or "scripting-s###-s###-" not in bad_run_reason_6326:
+        failures.append(f"V6.3.26 bogus object-name benchmark run was not rejected: {bad_run_reason_6326!r}")
+
+    valid_run_markers_6326, valid_run_reason_6326 = _validate_benchmark_record_request({
+        "run_id": "scripting-s001-s024-structured-run6-20260829T0806Z",
+        "results": [{"test_id": "S081", "status": "PASS", "reason": "verified"}],
+    }, [])
+    if valid_run_reason_6326 or not valid_run_markers_6326 or "[BENCH:S081:PASS:verified]" not in valid_run_markers_6326:
+        failures.append(f"V6.3.26 valid scripting run was rejected: {valid_run_reason_6326!r} {valid_run_markers_6326!r}")
+
+    out_of_range_reason_6326 = _scripting_benchmark_submission_policy_reason({
+        "run_id": "scripting-s001-s280-full-selftest",
+        "results": [{"test_id": "S999", "status": "PASS"}],
+    })
+    if not out_of_range_reason_6326 or "S001-S280" not in out_of_range_reason_6326:
+        failures.append(f"V6.3.26 out-of-range scripting result was not rejected: {out_of_range_reason_6326!r}")
+
+    run_select_rows_6326 = [
+        {
+            "event_kind": "benchmark_record",
+            "benchmark_run_id": "scripting-s001-s024-structured-run6-20260829T0806Z",
+            "event": "[BENCH:S080:PASS]",
+        },
+        {
+            "event_kind": "benchmark_record",
+            "benchmark_run_id": "SP07_A",
+            "event": "[BENCH:S007:PASS]",
+        },
+    ]
+    selected_run_6326, selected_events_6326 = _latest_verified_benchmark_events(run_select_rows_6326)
+    if selected_run_6326 != "scripting-s001-s024-structured-run6-20260829T0806Z" or selected_events_6326 != ["[BENCH:S080:PASS]"]:
+        failures.append(f"V6.3.26 latest-run selection accepted bogus run: {selected_run_6326!r} {selected_events_6326!r}")
+
+    _, immutable_reason_6326 = _validate_benchmark_record_request({
+        "run_id": "scripting-s001-s024-structured-run6-20260829T0806Z",
+        "results": [{"test_id": "S080", "status": "FAIL"}],
+    }, ["[BENCH:S080:PASS]"])
+    if not immutable_reason_6326 or "Refusing to rewrite existing controller-verified result" not in immutable_reason_6326:
+        failures.append(f"V6.3.26 existing result status could be rewritten: {immutable_reason_6326!r}")
 
     # V6.3.18 regression: a benchmark Script proven missing in confirmed Edit mode
     # has one deterministic recovery: exact create_instances bootstrap, then reread.
