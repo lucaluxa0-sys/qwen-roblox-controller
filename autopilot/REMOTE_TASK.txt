@@ -1,145 +1,20 @@
-Task-Instance: scripting-s001-s024-structured-run6-sp02-exact-harness-20260829T0835Z
-Benchmark-Run-ID: scripting-s001-s024-structured-run6-20260829T0806Z
-IDs are metadata only; never use them as studio_id.
+Task-Instance: run6-complete-wait-6.3.21-20260829T0901Z
 
-RESUME RUN6. SP01 S001-S012 is controller-verified DONE. Do not touch or rereport SP01.
+RUN6 IS COMPLETE.
+Controller-verified benchmark_progress already shows:
+- tests_seen=24
+- pass=24
+- partial=0
+- fail=0
+- pack_complete=SP01,SP02
+- batch_complete=scripting-s001-s024-structured-run6-20260829T0806Z
 
-LIVE CONTROLLER: 6.3.20
-ONLY GOAL: finish SP02 S013-S024, cleanup, batch-complete.
+DO NOT touch Roblox Studio.
+DO NOT rerun SP01 or SP02.
+DO NOT call benchmark tools.
+DO NOT inspect source or Output.
 
-TARGET:
-ServerScriptService.__QWEN_SCRIPT_BENCH__.SP02_ScriptingTests
+ONLY ACTION: emit exactly:
+[TASK_COMPLETE]
 
-AUTHORITATIVE STATE:
-The target exists and its authoritative source is exactly:
--- QWEN_CONTROLLER_SCRIPT_BOOTSTRAP
-
-Do not create it again. Do not use create_instances. Do not use execute_luau to assign Source.
-
-MANDATORY:
-1. script_read target once if controller cache requires it.
-2. multi_edit target with old_string EXACTLY "-- QWEN_CONTROLLER_SCRIPT_BOOTSTRAP" and new_string EXACTLY the harness between HARNESS_START/HARNESS_END below.
-3. Do not rewrite, improvise, shorten, or add syntax to the harness.
-4. Immediately script_read target.
-5. Start Play once, read Output once, stop Play.
-6. Use Output evidence for S013-S024.
-7. Call supervisor_benchmark_record once with exactly S013-S024 and pack_complete=["SP02"].
-8. Require tests_seen=24 and both SP01/SP02 markers.
-9. Remove all benchmark-created artifacts under ServerScriptService.__QWEN_SCRIPT_BENCH__, verify cleanup.
-10. Call supervisor_benchmark_record with batch_complete="scripting-s001-s024-structured-run6-20260829T0806Z".
-11. Emit [TASK_COMPLETE] only after batch marker accepted and gate clear.
-
-HARNESS_START
-local function runTest(id, fn)
-	local ok, err = pcall(fn)
-	if ok then
-		print("[SP02] " .. id .. " PASS")
-	else
-		warn("[SP02] " .. id .. " FAIL: " .. tostring(err))
-	end
-end
-
-runTest("S013", function()
-	local scopedValue = 13
-	assert(scopedValue == 13)
-end)
-
-runTest("S014", function()
-	local value = 1
-	do
-		local value = 2
-		assert(value == 2)
-	end
-	assert(value == 1)
-end)
-
-runTest("S015", function()
-	local missing = script:FindFirstChild("__QWEN_SP02_MISSING__")
-	assert(missing == nil)
-end)
-
-runTest("S016", function()
-	local falseValue = false
-	local nilValue = nil
-	assert(falseValue == false)
-	assert(falseValue ~= nil)
-	assert(nilValue == nil)
-end)
-
-runTest("S017", function()
-	local folder = Instance.new("Folder")
-	assert(typeof(folder) == "Instance")
-	assert(folder:IsA("Folder"))
-	folder:Destroy()
-end)
-
-runTest("S018", function()
-	local function addOne(value)
-		if value == nil then
-			return 0
-		end
-		return value + 1
-	end
-	assert(addOne(nil) == 0)
-	assert(addOne(4) == 5)
-end)
-
-runTest("S019", function()
-	local MAX_COUNT = 4
-	local count = 4
-	assert(count <= MAX_COUNT)
-end)
-
-runTest("S020", function()
-	local function pair()
-		return 2, 3
-	end
-	local a, b = pair()
-	assert(a == 2 and b == 3)
-end)
-
-runTest("S021", function()
-	local count = 0
-	local function increment()
-		count += 1
-	end
-	increment()
-	increment()
-	assert(count == 2)
-end)
-
-runTest("S022", function()
-	local oldInstance = Instance.new("Folder")
-	oldInstance.Name = "__QWEN_SP02_STALE__"
-	oldInstance.Parent = script
-	oldInstance:Destroy()
-	local freshInstance = Instance.new("Folder")
-	freshInstance.Name = "__QWEN_SP02_STALE__"
-	freshInstance.Parent = script
-	assert(oldInstance ~= freshInstance)
-	assert(oldInstance.Parent == nil)
-	assert(freshInstance.Parent == script)
-	freshInstance:Destroy()
-end)
-
-runTest("S023", function()
-	assert(tonumber("42") == 42)
-	assert(tonumber("not-a-number") == nil)
-	assert(tostring(42) == "42")
-end)
-
-runTest("S024", function()
-	local helper
-	local function callHelper()
-		return helper()
-	end
-	helper = function()
-		return 24
-	end
-	assert(callHelper() == 24)
-end)
-
-print("[SP02] COMPLETE")
-HARNESS_END
-
-If multi_edit is blocked, obey the controller's exact defect message and make only the smallest syntax correction to THIS harness. Never retry an identical blocked proposal.
+Then stop. A new SP03 task will arrive separately after controller 6.3.21 is live.
