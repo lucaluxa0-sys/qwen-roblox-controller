@@ -1,21 +1,53 @@
-Task-Instance: hold-sp07-for-controller-6.3.25-20260829T1055Z
+Task-Instance: sp07-repair-a-wrong-class-20260829T1058Z
 Benchmark-Run-ID: scripting-s001-s024-structured-run6-20260829T0806Z
 
-PAUSE SP07 ACTIONS UNTIL CONTROLLER 6.3.25 IS LIVE.
+CONTROLLER 6.3.25 IS LIVE. SP07 RECOVERY ONLY.
 
-Reason: controller 6.3.24 still routes a proven-missing benchmark path through Script-only recovery, while SP07 needs ModuleScript creation. Controller 6.3.25 fixes that safely.
+Known state:
+- ServerScriptService.__QWEN_SCRIPT_BENCH__.SP07_A was accidentally created by the old Script-only multi_edit recovery path.
+- Controller gate currently requires an authoritative reread of SP07_A.
+- SP07 is NOT complete, so this mistaken unfinished artifact may be removed/recreated.
+- Preserve SP01-SP06 and SP07_ScriptingTests.
 
-DO NOT call Roblox Studio tools.
-DO NOT call benchmark tools.
-DO NOT mutate anything.
-DO NOT inspect earlier packs.
+TARGET:
+ServerScriptService.__QWEN_SCRIPT_BENCH__.SP07_A
 
-ONLY ACTION:
-1. Call supervisor_decision_trace once:
-   goal="Hold SP07 until ModuleScript recovery controller is live"
-   evidence=["SP07 needs ModuleScript creation; controller 6.3.25 is pending activation"]
-   decision="Stop without changing Studio"
-   next_action="await a fresh SP07 continuation task after heartbeat proves 6.3.25 live"
+FLOW:
+1. script_read TARGET exactly once to satisfy the current reread gate.
+2. inspect_instance TARGET exactly once and determine ClassName.
+3. If ClassName is ModuleScript already, do not mutate it; require source is exactly "-- QWEN_CONTROLLER_SCRIPT_BOOTSTRAP", emit [TASK_COMPLETE], stop.
+4. If ClassName is Script:
+   - Only continue if the authoritative source from step 1 is exactly "-- QWEN_CONTROLLER_SCRIPT_BOOTSTRAP".
+   - Call supervisor_decision_trace:
+     goal="Repair wrong-class unfinished SP07_A benchmark artifact"
+     evidence=["authoritative SP07_A source is inert bootstrap","inspect_instance proves SP07_A is Script but task requires ModuleScript"]
+     decision="Delete only the mistaken unfinished SP07_A Script so it can be recreated as ModuleScript"
+     expected_result="SP07_A path becomes missing without touching any completed harness"
+     next_action="destroy only SP07_A"
+     confidence="high"
+   - Use one narrow mutation to destroy ONLY ServerScriptService.__QWEN_SCRIPT_BENCH__.SP07_A. Prefer an official delete tool if available; otherwise execute_luau may only locate that exact parent/name, assert IsA("Script"), then Destroy(). Do not create anything in this call and do not assign Source.
+5. script_read TARGET once. It should now report missing and establish the benchmark_script_missing recovery blocker.
+6. Call supervisor_decision_trace:
+   goal="Create correct SP07_A ModuleScript bootstrap"
+   evidence=["SP07_A is confirmed missing after removing the wrong-class unfinished Script","controller 6.3.25 supports exact ModuleScript bootstrap recovery"]
+   decision="Create exactly one ModuleScript named SP07_A under the benchmark parent with inert bootstrap Source"
+   expected_result="SP07_A exists as ModuleScript with exact bootstrap source"
+   next_action="create_instances once"
    confidence="high"
-2. Emit [TASK_COMPLETE]
-3. Stop immediately.
+7. create_instances ONCE with exactly:
+   className="ModuleScript"
+   name="SP07_A"
+   parent="ServerScriptService.__QWEN_SCRIPT_BENCH__"
+   Source="-- QWEN_CONTROLLER_SCRIPT_BOOTSTRAP"
+8. script_read TARGET immediately.
+9. inspect_instance TARGET once; require ClassName=ModuleScript and exact bootstrap source, controller gate clear.
+10. Emit [TASK_COMPLETE] and stop.
+
+FORBIDDEN:
+- touching SP07_B/SP07_C/SP07_Function in this micro-task
+- touching SP01-SP06
+- deleting SP07_ScriptingTests
+- arbitrary Source
+- execute_luau Script/ModuleScript creation
+- benchmark reporting
+- Play
