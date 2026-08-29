@@ -39,8 +39,8 @@ import urllib.request
 from pathlib import Path
 from typing import Any
 
-APP_NAME = "Qwen Roblox Enforced Proxy V6.3.3"
-VERSION = "6.3.3"
+APP_NAME = "Qwen Roblox Enforced Proxy V6.3.4"
+VERSION = "6.3.4"
 
 LOCALAPPDATA = Path(os.environ.get("LOCALAPPDATA", str(Path.home())))
 STATE_DIR = LOCALAPPDATA / "QwenRobloxEnforcedProxy"
@@ -81,6 +81,10 @@ GITHUB_FAILURE_LABEL = os.environ.get("QWEN_GITHUB_FAILURE_LABEL", "controller-f
 GITHUB_FAILURE_TIMEOUT = int(os.environ.get("QWEN_GITHUB_FAILURE_TIMEOUT", "20"))
 DEADLOCK_BLOCK_WINDOW = int(os.environ.get("QWEN_DEADLOCK_BLOCK_WINDOW", "8"))
 DEADLOCK_REPEAT_LIMIT = int(os.environ.get("QWEN_DEADLOCK_REPEAT_LIMIT", "3"))
+MCP_PROXY_OUTDATED_MARKER = "client proxy is out of date, restart to update"
+MCP_PROXY_RESTART_WINDOW_SECONDS = int(os.environ.get("QWEN_MCP_PROXY_RESTART_WINDOW_SECONDS", "300"))
+MCP_PROXY_AUTO_RESTART_LIMIT = int(os.environ.get("QWEN_MCP_PROXY_AUTO_RESTART_LIMIT", "2"))
+MCP_PROXY_RESTART_EXIT_CODE = int(os.environ.get("QWEN_MCP_PROXY_RESTART_EXIT_CODE", "75"))
 TELEMETRY_MAX_STRING = int(os.environ.get("QWEN_TELEMETRY_MAX_STRING", "12000"))
 TELEMETRY_HISTORY_TAIL = int(os.environ.get("QWEN_TELEMETRY_HISTORY_TAIL", "30"))
 
@@ -210,6 +214,15 @@ def new_state() -> dict[str, Any]:
             "last_failure_at": 0.0,
             "last_failure_kind": "",
             "last_event_at": 0.0,
+        },
+        "mcp_recovery": {
+            "status": "healthy",
+            "window_started_at": 0.0,
+            "auto_restart_attempts": 0,
+            "last_attempt_at": 0.0,
+            "outdated_seen_at": 0.0,
+            "recovered_at": 0.0,
+            "last_message": "",
         },
         "known_rules": [
             "Do not use Accessory.RootPart; Accessory has no RootPart property.",
@@ -385,6 +398,16 @@ def evidence_summary(state: dict[str, Any], max_items: int = 8) -> list[str]:
 
 
 def next_required_action_from_state(state: dict[str, Any]) -> str:
+    mcp_recovery = state.get("mcp_recovery")
+    if isinstance(mcp_recovery, dict):
+        recovery_status = str(mcp_recovery.get("status") or "")
+        if recovery_status == "auto_restart_requested":
+            return "Wait for the automatic Roblox MCP proxy restart; do not retry Studio tools during reconnect."
+        if recovery_status == "studio_restart_required":
+            return (
+                "Save the place and restart Roblox Studio once. The Roblox MCP client proxy remained out of date "
+                "after automatic bridge restarts; the manager/controller will resume automatically after Studio reconnects."
+            )
     blocker = state.get("current_blocker")
     mode = state.get("studio_mode")
     if isinstance(blocker, dict):
@@ -883,6 +906,13 @@ def _detect_block_deadlock(reason: str, name: str, args: dict[str, Any] | None) 
     history = [x for x in list(state.get("action_history") or [])[-max(3, DEADLOCK_BLOCK_WINDOW):] if isinstance(x, dict)]
     blocker = state.get("current_blocker")
     gate = state.get("gate")
+    mcp_recovery = state.get("mcp_recovery")
+    if isinstance(mcp_recovery, dict) and mcp_recovery.get("status") == "studio_restart_required":
+        return (
+            "mcp_environment_wait",
+            "Repeated tool calls cannot repair an outdated Studio client proxy. "
+            "Automatic bridge restarts are exhausted; wait for one safe Roblox Studio restart.",
+        )
     if isinstance(gate, dict) and isinstance(blocker, dict):
         if (
             gate.get("stage") == "need_playtest"
@@ -1027,6 +1057,14 @@ def build_resume_packet(state: dict[str, Any] | None = None) -> str:
         f"Studio mode: {state.get('studio_mode', 'unknown')}",
         f"Last script target: {state.get('last_script_target') or 'none'}",
     ]
+    mcp_recovery = state.get("mcp_recovery")
+    if isinstance(mcp_recovery, dict) and str(mcp_recovery.get("status") or "") not in {"", "healthy"}:
+        lines.append(
+            "MCP recovery: "
+            + str(mcp_recovery.get("status"))
+            + " attempts="
+            + str(mcp_recovery.get("auto_restart_attempts", 0))
+        )
     if isinstance(blocker, dict):
         lines.append(
             "Active blocker: "
@@ -2826,6 +2864,9 @@ def block_reason_for_call(name: str, args: dict[str, Any] | None) -> str | None:
     blocker = state.get("current_blocker")
     gate = state.get("gate")
     mode = state.get("studio_mode")
+    mcp_recovery = state.get("mcp_recovery")
+    if isinstance(mcp_recovery, dict) and mcp_recovery.get("status") == "studio_restart_required":
+        return _mcp_proxy_recovery_message(state)
 
     # V6.3.2 defensive reconciliation for persisted state: once a repaired
     # static-source blocker has handed control to the post-repair verification
@@ -3151,6 +3192,11 @@ def on_tool_result(name: str, args: dict[str, Any] | None, response: dict[str, A
         elif isinstance(g_after_evidence, dict) and g_after_evidence.get("stage") == "runtime_verified":
             state_update(lambda s: s.__setitem__("gate", None))
             notes.append("Post-edit runtime evidence requirements are satisfied; non-visual verification gate is clear.")
+
+    # Any successful official Roblox tool response proves the child/proxy path
+    # is usable again, so clear persisted stale-proxy recovery state.
+    if not is_error:
+        _mark_mcp_proxy_recovered()
 
     # Tool-level error/failure.
     if is_error:
@@ -3652,6 +3698,7 @@ def status_payload() -> dict[str, Any]:
         "tool_error_count": s.get("tool_error_count", 0),
         "runtime_error_count": s.get("runtime_error_count", 0),
         "runtime_evidence": s.get("runtime_evidence", {}),
+        "mcp_recovery": s.get("mcp_recovery", {}),
         "context_estimate": s.get("context_estimate", {}),
         "mutation_epoch": s.get("mutation_epoch", 0),
         "next_required_action": next_required_action_from_state(s),
@@ -3709,6 +3756,130 @@ def request_key(request_id: Any) -> str:
     return json.dumps(request_id, sort_keys=True, ensure_ascii=False)
 
 
+def _advance_mcp_proxy_recovery(state: dict[str, Any], now: float) -> str:
+    """Advance persisted stale-proxy recovery and return restart|manual.
+
+    Recovery survives controller restarts so an outdated Studio-side proxy cannot
+    cause an endless restart storm. A successful Roblox tool response resets it.
+    """
+    recovery = state.setdefault("mcp_recovery", {})
+    window_started = float(recovery.get("window_started_at", 0.0) or 0.0)
+    attempts = int(recovery.get("auto_restart_attempts", 0) or 0)
+    if window_started <= 0.0 or now - window_started > MCP_PROXY_RESTART_WINDOW_SECONDS:
+        window_started = now
+        attempts = 0
+
+    recovery["window_started_at"] = window_started
+    recovery["outdated_seen_at"] = now
+    recovery["last_message"] = MCP_PROXY_OUTDATED_MARKER
+
+    if attempts < max(0, MCP_PROXY_AUTO_RESTART_LIMIT):
+        attempts += 1
+        recovery["auto_restart_attempts"] = attempts
+        recovery["last_attempt_at"] = now
+        recovery["status"] = "auto_restart_requested"
+        return "restart"
+
+    recovery["auto_restart_attempts"] = attempts
+    recovery["status"] = "studio_restart_required"
+    return "manual"
+
+
+def _mcp_proxy_recovery_message(state: dict[str, Any]) -> str:
+    recovery = state.get("mcp_recovery") if isinstance(state, dict) else {}
+    attempts = int((recovery or {}).get("auto_restart_attempts", 0) or 0)
+    return (
+        "Roblox MCP proxy recovery is paused: Studio's client proxy is still out of date after "
+        f"{attempts} automatic bridge restart attempt(s). Save the place and restart Roblox Studio once. "
+        "Do not retry Studio tools until Studio reconnects; the manager/controller will resume automatically."
+    )
+
+
+def _mark_mcp_proxy_recovered() -> None:
+    with _state_lock:
+        recovery = copy.deepcopy(STATE.get("mcp_recovery"))
+    if not isinstance(recovery, dict) or str(recovery.get("status") or "") in {"", "healthy"}:
+        return
+
+    now = time.time()
+    def mutate(state: dict[str, Any]):
+        rec = state.setdefault("mcp_recovery", {})
+        rec["status"] = "healthy"
+        rec["auto_restart_attempts"] = 0
+        rec["window_started_at"] = 0.0
+        rec["recovered_at"] = now
+    state_update(mutate)
+    update_controller_health(
+        roblox_proxy_outdated=False,
+        roblox_proxy_recovery="healthy",
+        roblox_proxy_recovered_at=now,
+    )
+    refresh_checkpoint_files()
+    log("Roblox MCP proxy recovery confirmed by successful child tool response.")
+
+
+_mcp_proxy_exit_lock = threading.Lock()
+_mcp_proxy_exit_scheduled = False
+
+
+def _handle_mcp_proxy_outdated(clean_stderr: str) -> None:
+    """Recover the exact official-MCP stale client-proxy failure without Qwen churn."""
+    global _mcp_proxy_exit_scheduled
+    now = time.time()
+    decision_box = {"decision": "manual"}
+
+    def mutate(state: dict[str, Any]):
+        decision_box["decision"] = _advance_mcp_proxy_recovery(state, now)
+    state_update(mutate)
+
+    with _state_lock:
+        recovery = copy.deepcopy(STATE.get("mcp_recovery") or {})
+    decision = str(decision_box["decision"])
+    attempts = int(recovery.get("auto_restart_attempts", 0) or 0)
+
+    update_controller_health(
+        roblox_proxy_outdated=True,
+        roblox_proxy_outdated_seen_at=now,
+        roblox_proxy_recovery=(
+            "automatic_controller_restart" if decision == "restart" else "studio_restart_required"
+        ),
+        roblox_proxy_auto_restart_attempts=attempts,
+    )
+    telemetry_record_failure(
+        "roblox_mcp_proxy_outdated",
+        "Official Roblox MCP reported that the Studio client proxy is out of date.",
+        severity="warning" if decision == "restart" else "error",
+        response_excerpt=clip(clean_stderr, 2000),
+        extra={
+            "automatic": True,
+            "recovery_decision": decision,
+            "auto_restart_attempts": attempts,
+            "restart_window_seconds": MCP_PROXY_RESTART_WINDOW_SECONDS,
+        },
+    )
+    refresh_checkpoint_files()
+
+    if decision != "restart":
+        log("Roblox MCP stale proxy persisted after automatic bridge restarts; waiting for one safe Studio restart.")
+        return
+
+    with _mcp_proxy_exit_lock:
+        if _mcp_proxy_exit_scheduled:
+            return
+        _mcp_proxy_exit_scheduled = True
+
+    log(
+        f"Roblox MCP stale proxy detected; scheduling controller restart "
+        f"{attempts}/{MCP_PROXY_AUTO_RESTART_LIMIT} with exit code {MCP_PROXY_RESTART_EXIT_CODE}."
+    )
+
+    def exit_after_flush() -> None:
+        time.sleep(0.35)
+        os._exit(MCP_PROXY_RESTART_EXIT_CODE)
+
+    threading.Thread(target=exit_after_flush, daemon=True).start()
+
+
 def start_child() -> subprocess.Popen[str]:
     if os.name == "nt":
         if not ROBLOX_MCP_BAT.exists():
@@ -3741,6 +3912,8 @@ def child_stderr_loop(child: subprocess.Popen[str]) -> None:
                 clean = line.rstrip()
                 log("ROBLOX STDERR " + clean)
                 update_controller_health(last_roblox_stderr=clip(clean, 4000))
+                if MCP_PROXY_OUTDATED_MARKER in clean.lower():
+                    _handle_mcp_proxy_outdated(clean)
     except Exception:
         err = traceback.format_exc()
         update_controller_health(last_exception=clip(err, 6000))
@@ -4300,6 +4473,40 @@ def self_test_main() -> int:
         with _state_lock:
             STATE.clear()
             STATE.update(saved_state_633)
+
+    # V6.3.4 regression: the exact official stale-client-proxy error must
+    # auto-restart the bridge only a bounded number of times, then hard-gate
+    # Studio tools instead of letting Qwen burn cycles on identical result_error.
+    recovery_state = new_state()
+    d1 = _advance_mcp_proxy_recovery(recovery_state, 1000.0)
+    d2 = _advance_mcp_proxy_recovery(recovery_state, 1010.0)
+    d3 = _advance_mcp_proxy_recovery(recovery_state, 1020.0)
+    if (d1, d2, d3) != ("restart", "restart", "manual"):
+        failures.append(f"V6.3.4 stale proxy retry budget invalid: {(d1, d2, d3)!r}")
+    if recovery_state.get("mcp_recovery", {}).get("status") != "studio_restart_required":
+        failures.append("V6.3.4 stale proxy did not enter studio_restart_required after retry budget")
+
+    with _state_lock:
+        saved_state_634 = copy.deepcopy(STATE)
+        STATE.clear()
+        STATE.update(copy.deepcopy(recovery_state))
+    try:
+        reason = block_reason_for_call(
+            "script_read",
+            {"target_file": "game.ServerScriptService.Test", "studio_id": "", "should_read_entire_file": True},
+        )
+        if not reason or "restart Roblox Studio" not in reason:
+            failures.append(f"V6.3.4 stale proxy did not hard-gate Studio tools: {reason!r}")
+        dead = _detect_block_deadlock(reason or "proxy wait", "script_read", {})
+        if not dead or dead[0] != "mcp_environment_wait":
+            failures.append(f"V6.3.4 stale proxy wait misclassified: {dead!r}")
+        next_action = next_required_action_from_state(STATE)
+        if "restart Roblox Studio" not in next_action:
+            failures.append(f"V6.3.4 next action omitted safe Studio restart: {next_action!r}")
+    finally:
+        with _state_lock:
+            STATE.clear()
+            STATE.update(saved_state_634)
 
     # V6.3 regression: controller-bug packets are eligible for automatic
     # GitHub handoff, while non-controller failures are not.
