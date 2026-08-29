@@ -8,7 +8,7 @@ Target: ServerScriptService.__QWEN_SCRIPT_BENCH__.SP10_ScriptingTests
 Controller 6.3.26+ required. Preserve the harness after verification. Never create a new benchmark run.
 
 ## Required flow
-1. script_read exact target. If missing in Edit mode, use the controller-approved normal-Script bootstrap multi_edit and reread.
+1. script_read exact target. If missing in Edit mode, call supervisor_decision_trace with intended_script_class="Script", then use the controller-approved normal-Script bootstrap multi_edit and reread.
 2. supervisor_decision_trace before real source mutation.
 3. Install the exact harness below transactionally and authoritative script_read.
 4. supervisor_decision_trace before Play, start Play once, get_console_output after completion.
