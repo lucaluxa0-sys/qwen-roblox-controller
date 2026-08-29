@@ -1,3 +1,5 @@
+Task-Instance: e2e-heartbeat-20260829-remote-dispatch-v2
+
 Inspect the currently open Roblox Studio project using the Roblox MCP tools.
 
 This is a read-only full-automation end-to-end test.
@@ -10,3 +12,5 @@ Requirements:
 - Check Roblox Studio Output for relevant current errors.
 - Use controller/tool evidence rather than guessing.
 - When the inspection is complete and the controller gate is clear, emit [TASK_COMPLETE].
+
+This Task-Instance line is intentionally unique. Reusing the same human-readable task later must use a new Task-Instance value so the one-shot remote task channel treats it as a new task.
