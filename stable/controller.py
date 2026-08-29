@@ -39,8 +39,8 @@ import urllib.request
 from pathlib import Path
 from typing import Any
 
-APP_NAME = "Qwen Roblox Enforced Proxy V6.3.7"
-VERSION = "6.3.7"
+APP_NAME = "Qwen Roblox Enforced Proxy V6.3.8"
+VERSION = "6.3.8"
 
 LOCALAPPDATA = Path(os.environ.get("LOCALAPPDATA", str(Path.home())))
 STATE_DIR = LOCALAPPDATA / "QwenRobloxEnforcedProxy"
@@ -1062,7 +1062,10 @@ def _public_full_auto_health(raw: dict[str, Any]) -> dict[str, Any]:
         "cloudflare_running", "github_cli", "autopilot_running",
         "autopilot_status", "autopilot_generation", "autopilot_engine",
         "autopilot_last_error", "rollover_at", "remote_task_status",
-        "remote_task_last_check_at", "pending_reload", "last_error",
+        "remote_task_last_check_at", "remote_task_sha256",
+        "remote_task_blob_sha", "remote_task_source", "remote_task_instance_id",
+        "remote_task_effective_sha256", "remote_task_dispatch_status",
+        "remote_task_completed_sha256", "pending_reload", "last_error",
         "controller_disk_version", "controller_live_version",
         "controller_live_pid", "controller_live_matches_disk",
     )
@@ -1086,7 +1089,7 @@ def _public_autopilot_state(raw: dict[str, Any]) -> dict[str, Any]:
         "context_length", "rollover_at", "controller_state_clear", "engine",
         "runner_version", "last_error", "rollovers", "cycles",
         "last_prompt_tokens", "last_completion_tokens", "restart_reason",
-        "include_task",
+        "include_task", "task_sha256", "task_instance_id",
     )
     out: dict[str, Any] = {}
     for key in keys:
@@ -1204,6 +1207,19 @@ def _diagnostic_snapshot() -> dict[str, Any]:
         "manager": _public_full_auto_health(full_auto),
         "autopilot": _public_autopilot_state(autopilot),
         "model_updater": _public_model_updater_state(model_updater),
+        "remote_task_dispatch": {
+            "status": _public_safe_string(full_auto.get("remote_task_dispatch_status") or full_auto.get("remote_task_status"), 80),
+            "instance_id": _public_safe_string(full_auto.get("remote_task_instance_id"), 220),
+            "effective_sha256": _public_safe_string(full_auto.get("remote_task_effective_sha256") or full_auto.get("remote_task_sha256"), 80),
+            "completed_sha256": _public_safe_string(full_auto.get("remote_task_completed_sha256"), 80),
+            "runner_include_task": bool(autopilot.get("include_task")),
+            "runner_task_sha256": _public_safe_string(autopilot.get("task_sha256"), 80),
+            "runner_task_instance_id": _public_safe_string(autopilot.get("task_instance_id"), 220),
+            "protocol": (
+                "Remote tasks are one-shot. Reissuing the same human-readable goal should include a unique "
+                "Task-Instance: value so it is intentionally treated as a new task generation."
+            ),
+        },
         "recent_actions": [_public_action_row(x) for x in action_rows],
         "recent_failures": [_public_failure_row(x) for x in failure_rows],
         "recent_autopilot_events": _safe_autopilot_log_tail(),
@@ -5306,6 +5322,26 @@ def self_test_main() -> int:
         failures.append("V6.3.7 invalid model-updater SHA was accepted")
     except Exception:
         pass
+
+    # V6.3.8 regression: heartbeat projection must preserve remote-task
+    # dispatch identity so a remote go-check can prove whether the task was
+    # actually injected into the current runner generation.
+    projected_manager = _public_full_auto_health({
+        "remote_task_status": "ready",
+        "remote_task_instance_id": "e2e-123",
+        "remote_task_effective_sha256": "a" * 64,
+        "remote_task_dispatch_status": "pending",
+        "remote_task_completed_sha256": "b" * 64,
+    })
+    if projected_manager.get("remote_task_instance_id") != "e2e-123":
+        failures.append(f"V6.3.8 heartbeat lost remote task instance id: {projected_manager!r}")
+    projected_runner = _public_autopilot_state({
+        "include_task": True,
+        "task_sha256": "c" * 64,
+        "task_instance_id": "e2e-123",
+    })
+    if not projected_runner.get("include_task") or projected_runner.get("task_instance_id") != "e2e-123":
+        failures.append(f"V6.3.8 heartbeat lost runner task dispatch fields: {projected_runner!r}")
 
     # V6.3 regression: controller-bug packets are eligible for automatic
     # GitHub handoff, while non-controller failures are not.
