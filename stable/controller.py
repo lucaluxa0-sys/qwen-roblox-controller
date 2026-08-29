@@ -39,8 +39,8 @@ import urllib.request
 from pathlib import Path
 from typing import Any
 
-APP_NAME = "Qwen Roblox Enforced Proxy V6.3.12"
-VERSION = "6.3.12"
+APP_NAME = "Qwen Roblox Enforced Proxy V6.3.13"
+VERSION = "6.3.13"
 
 LOCALAPPDATA = Path(os.environ.get("LOCALAPPDATA", str(Path.home())))
 STATE_DIR = LOCALAPPDATA / "QwenRobloxEnforcedProxy"
@@ -4129,6 +4129,11 @@ def on_tool_result(name: str, args: dict[str, Any] | None, response: dict[str, A
         plan = mutation_plan or {}
         expected_source = plan.get("expected_source") if isinstance(plan, dict) else None
         previous_source = plan.get("previous_source") if isinstance(plan, dict) else None
+        bootstrap_initialization = (
+            isinstance(expected_source, str)
+            and normalize_source(expected_source) == SCRIPT_BOOTSTRAP_SOURCE
+            and normalize_source(previous_source or "") == ""
+        )
         def after_edit(state: dict[str, Any]):
             prior_blocker = state.get("current_blocker")
             prior_gate = state.get("gate")
@@ -4145,6 +4150,7 @@ def on_tool_result(name: str, args: dict[str, Any] | None, response: dict[str, A
                 "visual": visual,
                 "expected_hash": source_hash(expected_source) if isinstance(expected_source, str) and expected_source else "",
                 "structural_repair": structural_repair,
+                "bootstrap_initialization": bootstrap_initialization,
             }
             state["gate"] = {
                 "stage": "need_reread",
@@ -4156,10 +4162,12 @@ def on_tool_result(name: str, args: dict[str, Any] | None, response: dict[str, A
                 "previous_source": previous_source if isinstance(previous_source, str) and len(previous_source) <= 200000 else None,
                 "repair_reason": "",
                 "runtime_requirements": runtime_req,
+                "bootstrap_initialization": bootstrap_initialization,
             }
-            # A pure syntax/structural repair does not invalidate the runtime
-            # measurements that justified the semantic fix. Normal writes do.
-            if not structural_repair:
+            # Installing the inert controller bootstrap is not gameplay behavior.
+            # It still requires authoritative reread, but it must not invalidate
+            # runtime evidence or force a meaningless Play/Output cycle.
+            if not structural_repair and not bootstrap_initialization:
                 invalidate_runtime_evidence_for_mutation(state, name, args)
             if isinstance(prior_blocker, dict):
                 prior_blocker["stage"] = "repair_applied"
@@ -4245,9 +4253,18 @@ def on_tool_result(name: str, args: dict[str, Any] | None, response: dict[str, A
                                 "The last repair was valid, but do not playtest yet; reduce the next static defect with one narrow same-script edit."
                             )
                         else:
-                            gate["stage"] = "need_playtest"
                             gate["repair_reason"] = ""
-                            verification_note = "Edit reread matches the intended source and passed all V6 static checks."
+                            if gate.get("bootstrap_initialization") is True:
+                                gate["stage"] = "bootstrap_verified"
+                                state["gate"] = None
+                                verification_note = (
+                                    "Bootstrap reread matches the inert controller source. "
+                                    "No runtime verification is required for bootstrap initialization; "
+                                    "continue with the real transactional script edit."
+                                )
+                            else:
+                                gate["stage"] = "need_playtest"
+                                verification_note = "Edit reread matches the intended source and passed all V6 static checks."
                     else:
                         # Unknown edit schema: reread is still authoritative. Run conservative structural checks.
                         if defects or remaining_static:
@@ -5596,6 +5613,18 @@ def self_test_main() -> int:
         {"code": 'local f = Instance.new("Folder")\nf.Name = "Bench"\nf.Parent = game.ServerScriptService'},
     ):
         failures.append("V6.3.12 ordinary execute_luau Folder creation was incorrectly blocked")
+
+    # V6.3.13 regression: blank-to-bootstrap initialization is metadata-only
+    # scaffolding. It requires reread but must not be classified as a runtime
+    # gameplay change that forces Play/Output before the real harness edit.
+    bootstrap_init_expected = SCRIPT_BOOTSTRAP_SOURCE
+    bootstrap_init_previous = ""
+    bootstrap_init = (
+        normalize_source(bootstrap_init_expected) == SCRIPT_BOOTSTRAP_SOURCE
+        and normalize_source(bootstrap_init_previous) == ""
+    )
+    if not bootstrap_init:
+        failures.append("V6.3.13 blank-to-bootstrap initialization was not recognized")
 
     # V6.3 regression: controller-bug packets are eligible for automatic
     # GitHub handoff, while non-controller failures are not.
