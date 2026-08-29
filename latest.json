@@ -1,11 +1,11 @@
 {
   "schema_version": 1,
-  "version": "6.3.28",
+  "version": "6.3.29",
   "channel": "stable",
-  "controller_path": "releases/6.3.28/controller.py",
-  "release_path": "releases/6.3.28/controller.py",
-  "sha256": "2d65c5f77662db3d41418ff694ae3a87a78d546ef2209a22c149d937d25f49a2",
-  "published_at": "2026-08-29T11:20:00Z",
-  "notes": "Makes each controller-verified S### capability decision immutable within a benchmark run, including its evidence reason, preventing hold/status tasks from rewriting prior benchmark evidence.",
-  "url": "https://raw.githubusercontent.com/lucaluxa0-sys/qwen-roblox-controller/main/releases/6.3.28/controller.py"
+  "controller_path": "releases/6.3.29/controller.py",
+  "release_path": "releases/6.3.29/controller.py",
+  "sha256": "9e9beca96eb0e053a5e64b41799adc06f9ac24564a7931032e4a3f959e4f7b43",
+  "published_at": "2026-08-29T11:49:21Z",
+  "notes": "Adds one deterministic execute_luau fallback solely for a controller-proven-missing benchmark ModuleScript/LocalScript with an exact declared class/path and inert bootstrap Source; arbitrary Script.Source creation and rewriting remain blocked. Also tells autopilot to execute exact immediate tool instructions before prose or alternatives.",
+  "url": "https://raw.githubusercontent.com/lucaluxa0-sys/qwen-roblox-controller/main/releases/6.3.29/controller.py"
 }
