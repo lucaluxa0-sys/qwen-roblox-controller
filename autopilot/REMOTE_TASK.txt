@@ -1,42 +1,39 @@
-Task-Instance: sp07-function-create-unblock-20260829T1136Z
+Task-Instance: sp07-function-create-immediate-20260829T1142Z
 Benchmark-Run-ID: scripting-s001-s024-structured-run6-20260829T0806Z
 
-RESOLVE THE ACTIVE CONTROLLER BLOCKER ONLY.
+ACTIVE CONTROLLER STATE IS AUTHORITATIVE:
+- SP07_Function is confirmed missing in Edit mode.
+- A FRESH supervisor_decision_trace at 1788003420.6025014 already declared intended_script_class="ModuleScript".
+- That fresh trace is the authorization for the creation mutation.
 
-Active authoritative blocker:
-ServerScriptService.__QWEN_SCRIPT_BENCH__.SP07_Function is confirmed missing in Edit mode, stage=need_create_bootstrap.
+YOUR FIRST ROBLOX TOOL CALL MUST BE create_instances. DO NOT TRACE AGAIN BEFORE IT.
 
-DO NOT read/audit SP07_C yet. The active blocker must be resolved first.
-DO NOT use multi_edit.
-DO NOT use execute_luau.
-DO NOT search.
-DO NOT benchmark-report.
+Call create_instances exactly once with ONE object:
+className="ModuleScript"
+name="SP07_Function"
+parent="ServerScriptService.__QWEN_SCRIPT_BENCH__"
+properties.Source="-- QWEN_CONTROLLER_SCRIPT_BOOTSTRAP"
 
-EXACT ACTIONS:
-1. supervisor_decision_trace with:
-   goal="Create missing SP07_Function as exact ModuleScript bootstrap"
-   evidence=["controller confirms exact SP07_Function path missing in Edit mode","SP07_Function benchmark contract requires ModuleScript"]
-   decision="Use create_instances exactly once with className ModuleScript and inert bootstrap Source"
-   expected_result="SP07_Function exists as ModuleScript with exact bootstrap source"
-   next_action="create_instances exactly once"
-   confidence="high"
-   intended_script_class="ModuleScript"
-2. create_instances EXACTLY ONCE with ONE instance:
-   className="ModuleScript"
-   name="SP07_Function"
-   parent="ServerScriptService.__QWEN_SCRIPT_BENCH__"
-   properties:
-     Source="-- QWEN_CONTROLLER_SCRIPT_BOOTSTRAP"
-3. script_read exactly ServerScriptService.__QWEN_SCRIPT_BENCH__.SP07_Function
-4. inspect_instance exactly ServerScriptService.__QWEN_SCRIPT_BENCH__.SP07_Function
-5. Require ClassName=ModuleScript and exact bootstrap source.
-6. supervisor_decision_trace:
-   goal="Confirm SP07_Function blocker resolved"
-   evidence=["exact ClassName=ModuleScript","source matches inert bootstrap"]
-   decision="Stop after blocker resolution"
+Then:
+1. script_read exactly ServerScriptService.__QWEN_SCRIPT_BENCH__.SP07_Function
+2. inspect_instance exactly ServerScriptService.__QWEN_SCRIPT_BENCH__.SP07_Function
+3. Require ClassName=ModuleScript and exact bootstrap Source.
+4. supervisor_decision_trace:
+   goal="SP07_Function bootstrap created safely"
+   evidence=["create_instances succeeded","authoritative reread exact bootstrap","inspect ClassName=ModuleScript"]
+   decision="Stop with blocker resolved"
    actual_result="SP07_Function ModuleScript bootstrap verified"
-   next_action="await SP07_C audit/source continuation task"
+   next_action="await SP07_C audit and source installation task"
    confidence="high"
-7. Emit [TASK_COMPLETE] and STOP.
+5. Emit [TASK_COMPLETE] and STOP.
 
-No other tool calls.
+ABSOLUTELY FORBIDDEN BEFORE create_instances:
+- supervisor_decision_trace (already done)
+- script_read
+- inspect_instance
+- search
+- list_roblox_studios
+- get_studio_state
+- multi_edit
+- execute_luau
+- benchmark reporting
