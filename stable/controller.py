@@ -39,8 +39,8 @@ import urllib.request
 from pathlib import Path
 from typing import Any
 
-APP_NAME = "Qwen Roblox Enforced Proxy V6.3.4"
-VERSION = "6.3.4"
+APP_NAME = "Qwen Roblox Enforced Proxy V6.3.5"
+VERSION = "6.3.5"
 
 LOCALAPPDATA = Path(os.environ.get("LOCALAPPDATA", str(Path.home())))
 STATE_DIR = LOCALAPPDATA / "QwenRobloxEnforcedProxy"
@@ -418,9 +418,20 @@ def next_required_action_from_state(state: dict[str, Any]) -> str:
             if mode == "play":
                 return "Stop Play, then read the implicated script source."
             if stage in {"need_evidence", "need_source_read"}:
-                return f"Read {path}; then make one narrow structural repair."
+                return (
+                    f"Read {path}; if Studio targeting fails, call list_roblox_studios to refresh studio_id, "
+                    "then retry the same read. After a successful read, make one narrow structural repair."
+                )
             if stage in {"ready_for_edit", "ready_for_repair"}:
                 return f"Make one narrow syntax repair to {path}, then reread it."
+        if kind == "static_source_defect":
+            if mode == "play":
+                return f"Stop Play, then read {path}."
+            return (
+                f"Call script_read on {path} to restore an authoritative source snapshot; if Studio targeting fails, "
+                "call list_roblox_studios to refresh studio_id and retry the same script_read. "
+                "Then make one narrow same-script repair that reduces the recorded defect debt and reread."
+            )
         if stage == "need_evidence":
             return blocker_required_message(blocker) if "blocker_required_message" in globals() else "Gather direct evidence for the active blocker."
     gate = state.get("gate")
@@ -930,6 +941,29 @@ def _detect_block_deadlock(reason: str, name: str, args: dict[str, Any] | None) 
             sigs = [x.get("sig") for x in same_state[-DEADLOCK_REPEAT_LIMIT:]]
             notes = [str(x.get("note") or "") for x in same_state[-DEADLOCK_REPEAT_LIMIT:]]
             if len(set(sigs)) <= 2 or len(set(notes)) <= 2:
+                # If source repair remains satisfiable and discovery/read recovery
+                # actions exist, repeated policy violations are not a controller
+                # deadlock. If those recovery tools are themselves erroring, treat
+                # it as MCP/environment trouble instead of opening controller-bug
+                # issues for every repeated execute_luau/list attempt.
+                if isinstance(blocker, dict) and blocker.get("classification") in {"static_source_defect", "syntax_error"}:
+                    recent_result_errors = [
+                        x for x in history
+                        if x.get("kind") == "result_error"
+                        and x.get("name") in {"script_read", "get_studio_state", "list_roblox_studios"}
+                    ]
+                    path = blocker.get("path") or state.get("last_script_target") or "the implicated script"
+                    if len(recent_result_errors) >= 2:
+                        return (
+                            "mcp_recovery_loop",
+                            f"Repeated Studio recovery calls errored while source repair for {path} remained pending. "
+                            "Refresh studio_id with list_roblox_studios and retry the same script_read; do not guess IDs or bypass with execute_luau.",
+                        )
+                    return (
+                        "model_policy_loop",
+                        f"Repeated blocked actions ignored the valid source-repair path for {path}. "
+                        "Use list_roblox_studios only if Studio targeting needs refresh, then script_read the implicated script and make one narrow repair.",
+                    )
                 # A satisfiable runtime-verification gate with an explicit missing
                 # evidence path is a model/policy loop, not a controller deadlock.
                 # Do not auto-escalate it as controller_bug just because Qwen
@@ -2922,7 +2956,10 @@ def block_reason_for_call(name: str, args: dict[str, Any] | None) -> str | None:
                     return "Blocked: stop Play with start_stop_play(is_start=false), then retry the same script_read path."
 
         elif kind == "static_source_defect":
-            if n in {"supervisor_status", "supervisor_resume", "get_studio_state"}:
+            if n in {"supervisor_status", "supervisor_resume", "get_studio_state", "list_roblox_studios"}:
+                # Studio discovery is a safe recovery action. Static source debt
+                # must never prevent refreshing a stale/invalid studio_id before
+                # the authoritative script_read required for repair.
                 required_action = True
             elif n == "start_stop_play" and args.get("is_start") is False:
                 required_action = True
@@ -2944,7 +2981,7 @@ def block_reason_for_call(name: str, args: dict[str, Any] | None) -> str | None:
                 )
 
         elif kind == "syntax_error":
-            if n in {"get_studio_state", "script_read", "read_script_range"}:
+            if n in {"get_studio_state", "list_roblox_studios", "script_read", "read_script_range"}:
                 required_action = True
             elif stage in {"ready_for_edit", "ready_for_repair"} and tool_is_script_mutation(name, args):
                 actual_target = extract_target(args)
@@ -3197,6 +3234,19 @@ def on_tool_result(name: str, args: dict[str, Any] | None, response: dict[str, A
     # is usable again, so clear persisted stale-proxy recovery state.
     if not is_error:
         _mark_mcp_proxy_recovered()
+
+    # When an authoritative read/state lookup fails during source repair, do not
+    # let Qwen guess studio_id values or bypass the transaction system with
+    # execute_luau. Point it at the safe discovery path that remains allowed.
+    if is_error and n in {"script_read", "get_studio_state"}:
+        with _state_lock:
+            recovery_blocker = copy.deepcopy(STATE.get("current_blocker"))
+        if isinstance(recovery_blocker, dict) and recovery_blocker.get("classification") in {"static_source_defect", "syntax_error"}:
+            notes.append(
+                "STUDIO TARGET RECOVERY: this repair read/state lookup failed. "
+                "Call list_roblox_studios to refresh the real studio_id, then retry the SAME implicated script_read. "
+                "Do not guess studio_id and do not use execute_luau to read or rewrite Script.Source."
+            )
 
     # Tool-level error/failure.
     if is_error:
@@ -4507,6 +4557,66 @@ def self_test_main() -> int:
         with _state_lock:
             STATE.clear()
             STATE.update(saved_state_634)
+
+    # V6.3.5 regression: source-defect recovery must permit Studio discovery,
+    # give a precise recovery action, and never classify repeated policy mistakes
+    # as controller_deadlock while a valid discovery/read path exists.
+    source_repair_state = new_state()
+    source_repair_state["studio_mode"] = "edit"
+    source_repair_state["current_blocker"] = {
+        "classification": "static_source_defect",
+        "stage": "ready_for_repair",
+        "path": "game.ServerScriptService.Test",
+        "message": "known source defect",
+    }
+    source_repair_state["action_history"] = [
+        {
+            "at": 1.0,
+            "kind": "block",
+            "name": "execute_luau",
+            "sig": "same",
+            "mutation_epoch": 0,
+            "play_session": 0,
+            "note": "transaction invariant",
+        },
+        {
+            "at": 2.0,
+            "kind": "block",
+            "name": "execute_luau",
+            "sig": "same",
+            "mutation_epoch": 0,
+            "play_session": 0,
+            "note": "transaction invariant",
+        },
+        {
+            "at": 3.0,
+            "kind": "block",
+            "name": "execute_luau",
+            "sig": "same",
+            "mutation_epoch": 0,
+            "play_session": 0,
+            "note": "transaction invariant",
+        },
+    ]
+
+    with _state_lock:
+        saved_state_635 = copy.deepcopy(STATE)
+        STATE.clear()
+        STATE.update(copy.deepcopy(source_repair_state))
+    try:
+        reason = block_reason_for_call("list_roblox_studios", {})
+        if reason:
+            failures.append(f"V6.3.5 Studio discovery blocked during static source repair: {reason}")
+        next_action = next_required_action_from_state(STATE)
+        if "list_roblox_studios" not in next_action or "script_read" not in next_action:
+            failures.append(f"V6.3.5 source-repair next action was not recovery-specific: {next_action!r}")
+        dead = _detect_block_deadlock("loop", "execute_luau", {})
+        if dead and dead[0] == "controller_deadlock":
+            failures.append(f"V6.3.5 satisfiable source repair misclassified as controller deadlock: {dead}")
+    finally:
+        with _state_lock:
+            STATE.clear()
+            STATE.update(saved_state_635)
 
     # V6.3 regression: controller-bug packets are eligible for automatic
     # GitHub handoff, while non-controller failures are not.
