@@ -2595,7 +2595,9 @@ def _benchmark_missing_script_bootstrap_execute_luau(
     cls = str(intended_class or "").strip()
     if cls not in {"ModuleScript", "LocalScript"}:
         return False
-    wanted = canonical_target(target)
+    wanted = str(target or "").strip()
+    if wanted.lower().startswith("game."):
+        wanted = wanted[5:]
     if not wanted or "__qwen_script_bench__" not in wanted.lower():
         return False
     parts = wanted.split(".")
