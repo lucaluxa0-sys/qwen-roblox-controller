@@ -87,6 +87,10 @@ GITHUB_FAILURE_TIMEOUT = int(os.environ.get("QWEN_GITHUB_FAILURE_TIMEOUT", "20")
 # arbitrary prompts/completions, auth material, and hidden model reasoning are
 # never uploaded by this channel because the repository may be public.
 GITHUB_HEARTBEAT_ENABLED = os.environ.get("QWEN_GITHUB_HEARTBEAT_ENABLED", "1") != "0"
+GITHUB_HEARTBEAT_REPO = os.environ.get(
+    "QWEN_GITHUB_HEARTBEAT_REPO",
+    "lucaluxa0-sys/roblox-proxy",
+).strip()
 GITHUB_HEARTBEAT_INTERVAL = max(60, int(os.environ.get("QWEN_GITHUB_HEARTBEAT_INTERVAL", "120")))
 GITHUB_HEARTBEAT_TITLE = os.environ.get(
     "QWEN_GITHUB_HEARTBEAT_TITLE",
@@ -1040,7 +1044,7 @@ def _github_heartbeat_status(status: str, **fields: Any) -> None:
             "generated_at": time.time(),
             "controller_version": VERSION,
             "status": status,
-            "repo": GITHUB_FAILURE_REPO,
+            "repo": GITHUB_HEARTBEAT_REPO,
             "heartbeat_title": GITHUB_HEARTBEAT_TITLE,
             **fields,
         }
@@ -1080,7 +1084,7 @@ def _heartbeat_issue_body(snapshot: dict[str, Any]) -> str:
 
 
 def _publish_diagnostic_heartbeat_once() -> None:
-    if not GITHUB_HEARTBEAT_ENABLED or not GITHUB_FAILURE_REPO or not GITHUB_HEARTBEAT_TITLE:
+    if not GITHUB_HEARTBEAT_ENABLED or not GITHUB_HEARTBEAT_REPO or not GITHUB_HEARTBEAT_TITLE:
         return
     snapshot = _diagnostic_snapshot()
     try:
@@ -1103,7 +1107,7 @@ def _publish_diagnostic_heartbeat_once() -> None:
             body_path.write_text(_heartbeat_issue_body(snapshot), encoding="utf-8")
             listing = _github_run([
                 gh, "issue", "list",
-                "--repo", GITHUB_FAILURE_REPO,
+                "--repo", GITHUB_HEARTBEAT_REPO,
                 "--state", "all",
                 "--search", f"{GITHUB_HEARTBEAT_TITLE} in:title",
                 "--json", "number,title,state,url",
@@ -1128,7 +1132,7 @@ def _publish_diagnostic_heartbeat_once() -> None:
             if issue_number <= 0:
                 created = _github_run([
                     gh, "issue", "create",
-                    "--repo", GITHUB_FAILURE_REPO,
+                    "--repo", GITHUB_HEARTBEAT_REPO,
                     "--title", GITHUB_HEARTBEAT_TITLE,
                     "--body-file", str(body_path),
                 ])
@@ -1146,7 +1150,7 @@ def _publish_diagnostic_heartbeat_once() -> None:
             if issue_number > 0:
                 edited = _github_run([
                     gh, "issue", "edit", str(issue_number),
-                    "--repo", GITHUB_FAILURE_REPO,
+                    "--repo", GITHUB_HEARTBEAT_REPO,
                     "--body-file", str(body_path),
                 ])
                 if edited.returncode != 0:
@@ -1160,7 +1164,7 @@ def _publish_diagnostic_heartbeat_once() -> None:
                 if issue_state == "closed":
                     reopened = _github_run([
                         gh, "issue", "reopen", str(issue_number),
-                        "--repo", GITHUB_FAILURE_REPO,
+                        "--repo", GITHUB_HEARTBEAT_REPO,
                     ])
                     if reopened.returncode != 0:
                         log("heartbeat issue could not be reopened: " + _public_safe_string(reopened.stderr, 500))
@@ -1268,7 +1272,7 @@ def _report_failure_to_github(packet: dict[str, Any]) -> None:
         try:
             existing = _github_run([
                 gh, "issue", "list",
-                "--repo", GITHUB_FAILURE_REPO,
+                "--repo", GITHUB_HEARTBEAT_REPO,
                 "--state", "all",
                 "--search", f"{regression_id} in:body",
                 "--json", "number,url,title",
