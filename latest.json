@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
-  "version": "6.3.0",
+  "version": "6.3.1",
   "channel": "stable",
   "controller_path": "stable/controller.py",
-  "release_path": "releases/6.3.0/controller.py",
-  "sha256": "62e47692a4a94fc9b56e8540905f3a037e43a035b631f96a093aa15853426143",
-  "published_at": "2026-08-29T02:30:00Z",
-  "notes": "Adds automatic GitHub issue handoff for controller_bug failures using an existing authenticated GitHub CLI session, duplicate suppression by regression ID, reporter status telemetry, and CI self-tests."
+  "release_path": "releases/6.3.1/controller.py",
+  "sha256": "906ef6ac7228ef8c0f8a64c4351a41d1bc1dbd637230fac4c34175c81db4549a",
+  "published_at": "2026-08-29T04:43:00Z",
+  "notes": "Allows list_roblox_studios as a safe recovery/discovery action through exact post-edit verification gates so a disconnected/stale Studio ID cannot deadlock required playtest recovery."
 }
