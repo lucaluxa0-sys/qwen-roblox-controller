@@ -1,59 +1,277 @@
-Task-Instance: scripting-run6-sp07-resume-traced-20260829T1043Z
+Task-Instance: scripting-run6-sp07-deterministic-modules-20260829T1049Z
 Benchmark-Run-ID: scripting-s001-s024-structured-run6-20260829T0806Z
 Reserved-Full-Batch-ID: scripting-s001-s280-full-run6-20260829T1026Z
 
-RESUME SP07 MODULES. CONTINUE THE EXISTING VERIFIED RUN.
-Do NOT create a new benchmark run.
-Verified aggregate before SP07 commit: S001-S080 PASS; SP01-SP06 complete; partial=0; fail=0.
+SP07 ONLY. STOP RE-READING SP01-SP06.
+S001-S080 and SP01-SP06 are already controller-verified PASS. Do not inspect or touch them again.
 
-Controller 6.3.23+ is required. Controller 6.3.24 may activate during this task; obey its decision-trace gate literally if it does.
+Controller 6.3.24 is live. Its decision-trace gate is mandatory:
+- before EACH create_instances or source mutation: supervisor_decision_trace, then ONE meaningful action.
+- before EACH Play start: fresh supervisor_decision_trace, then start Play.
+- before supervisor_benchmark_record: fresh supervisor_decision_trace.
+- after an error changes the plan: fresh trace before retry.
+Routine reads and safe Play stop do not need a trace.
 
-TRACE RULE — REQUIRED
-Before EVERY meaningful mutation, Play start, or supervisor_benchmark_record:
-1. call supervisor_decision_trace,
-2. summarize only observable operational reasoning: goal, direct evidence, decision, expected result, next action, confidence,
-3. then perform ONE meaningful action.
-After an error, record a fresh trace before retrying/changing strategy.
-This is not hidden chain-of-thought.
+TARGET DRIVER
+ServerScriptService.__QWEN_SCRIPT_BENCH__.SP07_ScriptingTests
 
-CURRENT SP07 STATE
-- Existing driver: ServerScriptService.__QWEN_SCRIPT_BENCH__.SP07_ScriptingTests
-- Driver was previously created, source-written, authoritatively reread, playtested, and Output checked with no relevant runtime error.
-- Controller gate was clear before the hold.
-- Do not recreate the driver blindly.
-- Preserve SP01-SP06 and every completed harness.
+CREATE EXACTLY THESE FOUR ModuleScripts under:
+ServerScriptService.__QWEN_SCRIPT_BENCH__
+- SP07_A
+- SP07_B
+- SP07_C
+- SP07_Function
 
-ONLY GOAL: directly prove S081-S094 with real ModuleScript behavior, not inline lookalikes.
+FIRST:
+1. Narrowly inspect the SP07 folder once to see whether those four ModuleScripts already exist.
+2. If any are missing, call supervisor_decision_trace, then ONE create_instances call creating ONLY the missing ModuleScripts. Every new ModuleScript Source must be exactly:
+-- QWEN_CONTROLLER_SCRIPT_BOOTSTRAP
+3. script_read each of the four exact ModuleScript paths. For any that already contain real source, do not overwrite blindly; compare to the exact source below and only repair if needed.
 
-REQUIRED CAPABILITIES
-S081 ModuleScript returns table API; driver requires it.
-S082 ModuleScript returns/carries callable function behavior and is called correctly.
-S083 one-way module dependency.
-S084 graph remains acyclic; never intentionally execute a circular require.
-S085 immutable canonical config cannot be mutated by consumer.
-S086 same ModuleScript required twice returns cached/shared identity in one server VM.
-S087 require alone has minimal side effects.
-S088 explicit Init/Start lifecycle; require alone does not start.
-S089 dependency injection is actually used.
-S090 final module returns usable non-nil API.
-S091 private helper declaration order is correct.
-S092 server-only ModuleScript used only from server Script.
-S093 real three-ModuleScript A -> B -> C dependency graph with deterministic result.
-S094 two distinct caller paths use the same shared helper behavior.
+EXACT SOURCE: SP07_C
+local C = {}
+local CONFIG = table.freeze({
+	limit = 85,
+	tag = "SP07",
+})
+local sharedIdentity = {}
 
-EXECUTION RULES
-- If Play is running, stop it once; safe stop needs no trace.
-- Routine reads/inspection do not need trace. Use narrow paths only.
-- Inspect current SP07 driver and current children under ServerScriptService.__QWEN_SCRIPT_BENCH__.
-- Create the minimum real ModuleScripts necessary. For every new Script/ModuleScript, Source at creation must be exactly "-- QWEN_CONTROLLER_SCRIPT_BOOTSTRAP"; script_read exact path before replacing bootstrap.
-- Never use execute_luau for Script/ModuleScript creation or Source.
-- Obey every reread/runtime gate. If controller requires Play after an individual source write, follow it; do not bypass to batch writes.
-- Preserve all SP07 modules/scripts after verification. Temporary runtime Instances may be destroyed for isolation.
-- Final evidence must include labeled [SP07] S081 through S094 PASS in Output with no relevant runtime error.
-- Stop Play after evidence.
-- Before benchmark commit, call supervisor_decision_trace with the direct Output evidence and decision to record.
-- supervisor_benchmark_record MUST use run_id EXACTLY "scripting-s001-s024-structured-run6-20260829T0806Z", exactly S081-S094, pack_complete=["SP07"], and NO batch_complete.
-- Require heartbeat/controller result tests_seen=94, pass=94, partial=0, fail=0, SP01-SP07 markers, same run_id, gate clear.
-- Then emit [TASK_COMPLETE] and stop.
+C.dependsOn = "NONE"
 
-Never delete prior benchmark harnesses. Never retry an identical failed mutation without new evidence.
+function C.getBase()
+	return 7
+end
+
+function C.getConfig()
+	return CONFIG
+end
+
+function C.getSharedIdentity()
+	return sharedIdentity
+end
+
+function C.sharedHelper(value)
+	return value * 2
+end
+
+return C
+
+EXACT SOURCE: SP07_B
+local C = require(script.Parent.SP07_C)
+
+local B = {}
+B.dependsOn = "SP07_C"
+
+function B.value()
+	return C.getBase() + 1
+end
+
+function B.shared(value)
+	return C.sharedHelper(value)
+end
+
+return B
+
+EXACT SOURCE: SP07_A
+local B = require(script.Parent.SP07_B)
+
+local A = {}
+A.dependsOn = "SP07_B"
+
+local initialized = false
+local started = false
+local injectedDependency = nil
+
+local function privateHelper(value)
+	return value + 1
+end
+
+function A.getInitialState()
+	return initialized, started
+end
+
+function A.Init(dependency)
+	assert(type(dependency) == "table")
+	assert(dependency.value ~= nil)
+	injectedDependency = dependency
+	initialized = true
+end
+
+function A.Start()
+	assert(initialized == true)
+	started = true
+end
+
+function A.getState()
+	return initialized, started
+end
+
+function A.getInjected()
+	return injectedDependency.value
+end
+
+function A.compute(value)
+	return privateHelper(B.value() + value)
+end
+
+function A.shared(value)
+	return B.shared(value)
+end
+
+return A
+
+EXACT SOURCE: SP07_Function
+return function(value)
+	return value + 82
+end
+
+MODULE SOURCE INSTALL FLOW
+For EACH ModuleScript that is still bootstrap:
+a. supervisor_decision_trace describing that exact module source install.
+b. multi_edit exact bootstrap -> EXACT source above, one pair, replace_all=false.
+c. script_read same module.
+d. If controller requires runtime verification, supervisor_decision_trace then start Play once, get_console_output once, stop Play once. Do not fight the gate.
+Then continue to the next module.
+Do not improvise the module sources.
+
+After all four exact module sources are authoritatively reread, script_read the existing SP07 driver. Replace its complete current source with EXACTLY this driver in one transactional multi_edit, using the actual current full source as old_string:
+
+DRIVER_START
+local folder = script.Parent
+local A = require(folder.SP07_A)
+local AAgain = require(folder.SP07_A)
+local B = require(folder.SP07_B)
+local C = require(folder.SP07_C)
+local CAgain = require(folder.SP07_C)
+local FunctionModule = require(folder.SP07_Function)
+
+local function runTest(id, fn)
+	local ok, err = pcall(fn)
+	if ok then
+		print("[SP07] " .. id .. " PASS")
+	else
+		warn("[SP07] " .. id .. " FAIL: " .. tostring(err))
+	end
+end
+
+runTest("S081", function()
+	assert(type(A) == "table")
+	assert(type(A.compute) == "function")
+end)
+
+runTest("S082", function()
+	assert(type(FunctionModule) == "function")
+	assert(FunctionModule(1) == 83)
+end)
+
+runTest("S083", function()
+	assert(A.dependsOn == "SP07_B")
+	assert(B.dependsOn == "SP07_C")
+end)
+
+runTest("S084", function()
+	assert(A.dependsOn == "SP07_B")
+	assert(B.dependsOn == "SP07_C")
+	assert(C.dependsOn == "NONE")
+end)
+
+runTest("S085", function()
+	local config = C.getConfig()
+	assert(config.limit == 85)
+	local ok = pcall(function()
+		config.limit = 1
+	end)
+	assert(ok == false)
+	assert(C.getConfig().limit == 85)
+end)
+
+runTest("S086", function()
+	assert(A == AAgain)
+	assert(C == CAgain)
+	assert(C.getSharedIdentity() == CAgain.getSharedIdentity())
+end)
+
+runTest("S087", function()
+	local initialized, started = A.getInitialState()
+	assert(initialized == false)
+	assert(started == false)
+end)
+
+runTest("S088", function()
+	A.Init({value = 88})
+	local initialized, startedBefore = A.getState()
+	assert(initialized == true)
+	assert(startedBefore == false)
+	A.Start()
+	local initializedAfter, startedAfter = A.getState()
+	assert(initializedAfter == true)
+	assert(startedAfter == true)
+end)
+
+runTest("S089", function()
+	A.Init({value = 89})
+	assert(A.getInjected() == 89)
+end)
+
+runTest("S090", function()
+	assert(A ~= nil)
+	assert(B ~= nil)
+	assert(C ~= nil)
+	assert(FunctionModule ~= nil)
+end)
+
+runTest("S091", function()
+	assert(A.compute(1) == 10)
+end)
+
+runTest("S092", function()
+	assert(script:IsA("Script"))
+	assert(folder.Parent == game:GetService("ServerScriptService"))
+	assert(folder.SP07_A:IsA("ModuleScript"))
+	assert(folder.SP07_B:IsA("ModuleScript"))
+	assert(folder.SP07_C:IsA("ModuleScript"))
+	assert(folder.SP07_Function:IsA("ModuleScript"))
+end)
+
+runTest("S093", function()
+	assert(A.dependsOn == "SP07_B")
+	assert(B.dependsOn == "SP07_C")
+	assert(C.dependsOn == "NONE")
+	assert(A.compute(0) == 9)
+end)
+
+runTest("S094", function()
+	local function callerOne(value)
+		return C.sharedHelper(value)
+	end
+	local function callerTwo(value)
+		return C.sharedHelper(value)
+	end
+	assert(callerOne(4) == 8)
+	assert(callerTwo(4) == 8)
+	assert(A.shared(4) == 8)
+	assert(B.shared(4) == 8)
+end)
+
+print("[SP07] COMPLETE")
+DRIVER_END
+
+DRIVER FLOW
+1. supervisor_decision_trace before driver multi_edit.
+2. multi_edit current full driver source -> exact DRIVER_START/END contents above.
+3. script_read driver immediately.
+4. supervisor_decision_trace before required Play.
+5. start Play once.
+6. get_console_output. Require labeled PASS for every S081-S094 and [SP07] COMPLETE, with no relevant runtime error.
+7. stop Play.
+8. Preserve driver and all four ModuleScripts. Do NOT delete or disable them unless disabling is necessary to prevent later interference; if disabled, keep visible/readable.
+9. supervisor_decision_trace summarizing direct Output evidence and decision to commit.
+10. supervisor_benchmark_record:
+   run_id="scripting-s001-s024-structured-run6-20260829T0806Z"
+   results exactly S081-S094 PASS
+   pack_complete=["SP07"]
+   NO batch_complete.
+11. Require controller-verified tests_seen=94 pass=94 partial=0 fail=0, SP01-SP07 markers, same run_id, gate clear.
+12. Emit [TASK_COMPLETE] and stop.
+
+No pathless tree searches. No SP01-SP06 reads. No execute_luau for Source. Never retry an identical failed mutation without new evidence.
