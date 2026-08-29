@@ -39,8 +39,8 @@ import urllib.request
 from pathlib import Path
 from typing import Any
 
-APP_NAME = "Qwen Roblox Enforced Proxy V6.3.13"
-VERSION = "6.3.13"
+APP_NAME = "Qwen Roblox Enforced Proxy V6.3.14"
+VERSION = "6.3.14"
 
 LOCALAPPDATA = Path(os.environ.get("LOCALAPPDATA", str(Path.home())))
 STATE_DIR = LOCALAPPDATA / "QwenRobloxEnforcedProxy"
@@ -3634,6 +3634,22 @@ def cached_evidence_for_target(target: str) -> str:
     return best[1][:600] if best else ""
 
 
+def benchmark_broad_tree_reason(name: str, args: dict[str, Any] | None, state: dict[str, Any]) -> str | None:
+    """Prevent full-tree prompt explosions when an exact benchmark target is already known."""
+    if (name or "").lower() != "search_game_tree":
+        return None
+    if extract_target(args or {}):
+        return None
+    target = str(state.get("last_script_target") or "")
+    if "__QWEN_SCRIPT_BENCH__" not in target:
+        return None
+    return (
+        "Blocked: a pathless search_game_tree would dump the whole place even though the active benchmark target is already known: "
+        f"{target}. Call script_read on that exact path, or search_game_tree with a narrow benchmark parent path if folder existence must be checked. "
+        "Do not spend context re-enumerating the entire DataModel."
+    )
+
+
 def loop_guard_reason(name: str, args: dict[str, Any] | None) -> str | None:
     n = (name or "").lower()
     args = args or {}
@@ -3699,6 +3715,11 @@ def block_reason_for_call(name: str, args: dict[str, Any] | None) -> str | None:
     blocker = state.get("current_blocker")
     gate = state.get("gate")
     mode = state.get("studio_mode")
+
+    benchmark_tree_reason = benchmark_broad_tree_reason(name, args, state)
+    if benchmark_tree_reason:
+        return benchmark_tree_reason
+
     mcp_recovery = state.get("mcp_recovery")
     if isinstance(mcp_recovery, dict) and mcp_recovery.get("status") == "studio_restart_required":
         return _mcp_proxy_recovery_message(state)
@@ -5625,6 +5646,25 @@ def self_test_main() -> int:
     )
     if not bootstrap_init:
         failures.append("V6.3.13 blank-to-bootstrap initialization was not recognized")
+
+    # V6.3.14 regression: after a benchmark target is known, pathless whole-tree
+    # enumeration is blocked to avoid multi-thousand-token prompt explosions.
+    bench_state = new_state()
+    bench_state["last_script_target"] = "ServerScriptService.__QWEN_SCRIPT_BENCH__.SP01_ScriptingTests"
+    broad_reason = benchmark_broad_tree_reason("search_game_tree", {"datamodel_type": "Edit"}, bench_state)
+    if not broad_reason or "whole place" not in broad_reason:
+        failures.append(f"V6.3.14 pathless benchmark tree search was not blocked: {broad_reason!r}")
+    narrow_reason = benchmark_broad_tree_reason(
+        "search_game_tree",
+        {"datamodel_type": "Edit", "path": "ServerScriptService.__QWEN_SCRIPT_BENCH__"},
+        bench_state,
+    )
+    if narrow_reason:
+        failures.append(f"V6.3.14 narrow benchmark tree search was incorrectly blocked: {narrow_reason!r}")
+    normal_state = new_state()
+    normal_state["last_script_target"] = "ServerScriptService.GameplayScript"
+    if benchmark_broad_tree_reason("search_game_tree", {"datamodel_type": "Edit"}, normal_state):
+        failures.append("V6.3.14 non-benchmark broad tree search was incorrectly blocked")
 
     # V6.3 regression: controller-bug packets are eligible for automatic
     # GitHub handoff, while non-controller failures are not.
