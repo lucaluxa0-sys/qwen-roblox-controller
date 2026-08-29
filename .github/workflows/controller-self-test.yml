@@ -39,5 +39,6 @@ jobs:
         run: |
           latest="$(find releases -mindepth 2 -maxdepth 2 -name controller.py | sort -V | tail -n 1)"
           echo "Testing $latest"
+          sha256sum "$latest"
           python "$latest" --self-test
           python "$latest" --telemetry-smoke-test
