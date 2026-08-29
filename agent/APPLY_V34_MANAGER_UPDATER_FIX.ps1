@@ -13,26 +13,22 @@ if (-not (Test-Path $PythonW)) { $PythonW = $Python }
 
 $stamp = Get-Date -Format "yyyyMMdd-HHmmss"
 $backup = Join-Path $InstallDir "v34-manager-fix-backup-$stamp"
+$stage = Join-Path $InstallDir ".v34-manager-fix-$stamp"
 New-Item -ItemType Directory -Path $backup -Force | Out-Null
+New-Item -ItemType Directory -Path $stage -Force | Out-Null
 Copy-Item $Manager (Join-Path $backup "qwen_full_auto_manager.py") -Force
 Copy-Item $Updater (Join-Path $backup "qwen_controller_updater.py") -Force
 
-Write-Host "Stopping manager only..."
-Get-CimInstance Win32_Process |
-    Where-Object { $_.CommandLine -and $_.CommandLine -match "qwen_full_auto_manager\.py" } |
-    ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
-
-Start-Sleep -Seconds 1
-
-# Fix 1: V3.3 disk/live comparison silently returned blank because re was never imported.
+# Stage Fix 1: V3.3 disk/live comparison silently returned blank because re was never imported.
 $mgr = Get-Content $Manager -Raw
 if ($mgr -notmatch "(?m)^import re$") {
     $mgr = $mgr -replace "(?m)^import hashlib\s*$", "import hashlib`r`nimport re"
 }
 $mgr = $mgr.Replace('LAST["manager_version"] = "3.3.0"', 'LAST["manager_version"] = "3.4.0"')
-[System.IO.File]::WriteAllText($Manager, $mgr, (New-Object System.Text.UTF8Encoding($false)))
+$mgrStage = Join-Path $stage "qwen_full_auto_manager.py"
+[System.IO.File]::WriteAllText($mgrStage, $mgr, (New-Object System.Text.UTF8Encoding($false)))
 
-# Fix 2: raw.githubusercontent branch URLs could return stale latest.json/controller content.
+# Stage Fix 2: raw.githubusercontent branch URLs could return stale latest.json/controller content.
 # Add a unique query value to both manifest and controller fetches.
 $upd = Get-Content $Updater -Raw
 $oldManifest = 'manifest = json.loads(fetch_bytes(MANIFEST_URL).decode("utf-8"))'
@@ -41,28 +37,44 @@ $newManifest = 'manifest_url = MANIFEST_URL + "?qwen_no_cache=" + str(int(time.t
 if ($upd.Contains($oldManifest)) {
     $upd = $upd.Replace($oldManifest, $newManifest)
 }
-
 $oldController = 'url = f"{RAW_BASE}/{path}"'
 $newController = 'url = f"{RAW_BASE}/{path}?qwen_no_cache={int(time.time() * 1000)}"'
 if ($upd.Contains($oldController)) {
     $upd = $upd.Replace($oldController, $newController)
 }
-[System.IO.File]::WriteAllText($Updater, $upd, (New-Object System.Text.UTF8Encoding($false)))
+$updStage = Join-Path $stage "qwen_controller_updater.py"
+[System.IO.File]::WriteAllText($updStage, $upd, (New-Object System.Text.UTF8Encoding($false)))
 
-Write-Host "Compiling patched manager/updater..."
-& $Python -m py_compile $Manager
-if ($LASTEXITCODE -ne 0) { throw "Manager compile failed; backup is $backup" }
-& $Python -m py_compile $Updater
-if ($LASTEXITCODE -ne 0) { throw "Updater compile failed; backup is $backup" }
+Write-Host "Validating staged manager/updater before install..."
+& $Python -m py_compile $mgrStage
+if ($LASTEXITCODE -ne 0) { throw "Staged manager compile failed; originals were not changed." }
+& $Python -m py_compile $updStage
+if ($LASTEXITCODE -ne 0) { throw "Staged updater compile failed; originals were not changed." }
+
+Write-Host "Stopping manager only..."
+Get-CimInstance Win32_Process |
+    Where-Object { $_.CommandLine -and $_.CommandLine -match "qwen_full_auto_manager\.py" } |
+    ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
+Start-Sleep -Seconds 1
+
+Copy-Item $mgrStage $Manager -Force
+Copy-Item $updStage $Updater -Force
 
 Write-Host "Forcing one fresh controller check..."
 & $Python $Updater --once
-if ($LASTEXITCODE -ne 0) { throw "Controller updater failed; backup is $backup" }
+if ($LASTEXITCODE -ne 0) {
+    Copy-Item (Join-Path $backup "qwen_full_auto_manager.py") $Manager -Force
+    Copy-Item (Join-Path $backup "qwen_controller_updater.py") $Updater -Force
+    Start-Process -FilePath $PythonW -ArgumentList "`"$Manager`"" -WorkingDirectory $InstallDir -WindowStyle Hidden
+    throw "Controller updater failed. Originals restored automatically."
+}
 
 Write-Host "Restarting manager..."
 Start-Process -FilePath $PythonW -ArgumentList "`"$Manager`"" -WorkingDirectory $InstallDir -WindowStyle Hidden
 
 Start-Sleep -Seconds 3
+Remove-Item $stage -Recurse -Force -ErrorAction SilentlyContinue
+
 Write-Host ""
 Write-Host "V3.4 MANAGER/UPDATER FIX INSTALLED" -ForegroundColor Green
 Write-Host " - disk/live controller version check fixed (missing import re)"
