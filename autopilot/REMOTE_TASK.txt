@@ -1,22 +1,59 @@
-Task-Instance: hold-sp07-for-controller-6.3.24-20260829T1041Z
+Task-Instance: scripting-run6-sp07-resume-traced-20260829T1043Z
+Benchmark-Run-ID: scripting-s001-s024-structured-run6-20260829T0806Z
+Reserved-Full-Batch-ID: scripting-s001-s280-full-run6-20260829T1026Z
 
-TEMPORARY SAFETY HOLD.
+RESUME SP07 MODULES. CONTINUE THE EXISTING VERIFIED RUN.
+Do NOT create a new benchmark run.
+Verified aggregate before SP07 commit: S001-S080 PASS; SP01-SP06 complete; partial=0; fail=0.
 
-Controller 6.3.24 is being promoted to enforce supervisor_decision_trace before mutations, Play starts, and benchmark commits.
+Controller 6.3.23+ is required. Controller 6.3.24 may activate during this task; obey its decision-trace gate literally if it does.
 
-Preserve current SP07 evidence and artifacts exactly as they are.
-DO NOT call Roblox Studio tools.
-DO NOT mutate anything.
-DO NOT start Play.
-DO NOT call supervisor_benchmark_record.
+TRACE RULE — REQUIRED
+Before EVERY meaningful mutation, Play start, or supervisor_benchmark_record:
+1. call supervisor_decision_trace,
+2. summarize only observable operational reasoning: goal, direct evidence, decision, expected result, next action, confidence,
+3. then perform ONE meaningful action.
+After an error, record a fresh trace before retrying/changing strategy.
+This is not hidden chain-of-thought.
 
-Record one supervisor_decision_trace with:
-- goal: hold SP07 for 6.3.24 activation
-- decision: stop without changing Studio
-- next_action: await fresh SP07 continuation task
-- confidence: high
+CURRENT SP07 STATE
+- Existing driver: ServerScriptService.__QWEN_SCRIPT_BENCH__.SP07_ScriptingTests
+- Driver was previously created, source-written, authoritatively reread, playtested, and Output checked with no relevant runtime error.
+- Controller gate was clear before the hold.
+- Do not recreate the driver blindly.
+- Preserve SP01-SP06 and every completed harness.
 
-Then emit exactly:
-[TASK_COMPLETE]
+ONLY GOAL: directly prove S081-S094 with real ModuleScript behavior, not inline lookalikes.
 
-Stop immediately.
+REQUIRED CAPABILITIES
+S081 ModuleScript returns table API; driver requires it.
+S082 ModuleScript returns/carries callable function behavior and is called correctly.
+S083 one-way module dependency.
+S084 graph remains acyclic; never intentionally execute a circular require.
+S085 immutable canonical config cannot be mutated by consumer.
+S086 same ModuleScript required twice returns cached/shared identity in one server VM.
+S087 require alone has minimal side effects.
+S088 explicit Init/Start lifecycle; require alone does not start.
+S089 dependency injection is actually used.
+S090 final module returns usable non-nil API.
+S091 private helper declaration order is correct.
+S092 server-only ModuleScript used only from server Script.
+S093 real three-ModuleScript A -> B -> C dependency graph with deterministic result.
+S094 two distinct caller paths use the same shared helper behavior.
+
+EXECUTION RULES
+- If Play is running, stop it once; safe stop needs no trace.
+- Routine reads/inspection do not need trace. Use narrow paths only.
+- Inspect current SP07 driver and current children under ServerScriptService.__QWEN_SCRIPT_BENCH__.
+- Create the minimum real ModuleScripts necessary. For every new Script/ModuleScript, Source at creation must be exactly "-- QWEN_CONTROLLER_SCRIPT_BOOTSTRAP"; script_read exact path before replacing bootstrap.
+- Never use execute_luau for Script/ModuleScript creation or Source.
+- Obey every reread/runtime gate. If controller requires Play after an individual source write, follow it; do not bypass to batch writes.
+- Preserve all SP07 modules/scripts after verification. Temporary runtime Instances may be destroyed for isolation.
+- Final evidence must include labeled [SP07] S081 through S094 PASS in Output with no relevant runtime error.
+- Stop Play after evidence.
+- Before benchmark commit, call supervisor_decision_trace with the direct Output evidence and decision to record.
+- supervisor_benchmark_record MUST use run_id EXACTLY "scripting-s001-s024-structured-run6-20260829T0806Z", exactly S081-S094, pack_complete=["SP07"], and NO batch_complete.
+- Require heartbeat/controller result tests_seen=94, pass=94, partial=0, fail=0, SP01-SP07 markers, same run_id, gate clear.
+- Then emit [TASK_COMPLETE] and stop.
+
+Never delete prior benchmark harnesses. Never retry an identical failed mutation without new evidence.
