@@ -28,6 +28,7 @@ import os
 import queue
 import hashlib
 import re
+import shutil
 import subprocess
 import sys
 import threading
@@ -38,8 +39,8 @@ import urllib.request
 from pathlib import Path
 from typing import Any
 
-APP_NAME = "Qwen Roblox Enforced Proxy V6.2"
-VERSION = "6.2.0"
+APP_NAME = "Qwen Roblox Enforced Proxy V6.3"
+VERSION = "6.3.0"
 
 LOCALAPPDATA = Path(os.environ.get("LOCALAPPDATA", str(Path.home())))
 STATE_DIR = LOCALAPPDATA / "QwenRobloxEnforcedProxy"
@@ -65,7 +66,19 @@ TELEMETRY_TEST_RESULTS_FILE = TELEMETRY_DIR / "test_results.json"
 TELEMETRY_AUTOPILOT_FILE = TELEMETRY_DIR / "autopilot_runs.jsonl"
 TELEMETRY_FAILURE_PACKET_FILE = TELEMETRY_DIR / "failure_packet.json"
 TELEMETRY_REGRESSION_CASES_FILE = TELEMETRY_DIR / "regression_cases.jsonl"
+TELEMETRY_GITHUB_REPORTER_FILE = TELEMETRY_DIR / "github_reporter_status.json"
 TELEMETRY_SCHEMA_VERSION = 1
+
+# Optional automatic GitHub failure handoff. No token is embedded in the
+# controller. The reporter uses the user's existing authenticated GitHub CLI
+# session (gh auth login) and is inert if gh is unavailable or unauthenticated.
+GITHUB_FAILURE_REPORTING = os.environ.get("QWEN_GITHUB_FAILURE_REPORTING", "1") != "0"
+GITHUB_FAILURE_REPO = os.environ.get(
+    "QWEN_GITHUB_FAILURE_REPO",
+    "lucaluxa0-sys/qwen-roblox-controller",
+).strip()
+GITHUB_FAILURE_LABEL = os.environ.get("QWEN_GITHUB_FAILURE_LABEL", "controller-failure").strip()
+GITHUB_FAILURE_TIMEOUT = int(os.environ.get("QWEN_GITHUB_FAILURE_TIMEOUT", "20"))
 DEADLOCK_BLOCK_WINDOW = int(os.environ.get("QWEN_DEADLOCK_BLOCK_WINDOW", "8"))
 DEADLOCK_REPEAT_LIMIT = int(os.environ.get("QWEN_DEADLOCK_REPEAT_LIMIT", "3"))
 TELEMETRY_MAX_STRING = int(os.environ.get("QWEN_TELEMETRY_MAX_STRING", "12000"))
@@ -543,6 +556,7 @@ def telemetry_status_payload(state: dict[str, Any] | None = None) -> dict[str, A
             "autopilot_runs": str(TELEMETRY_AUTOPILOT_FILE),
             "failure_packet": str(TELEMETRY_FAILURE_PACKET_FILE),
             "regression_cases": str(TELEMETRY_REGRESSION_CASES_FILE),
+            "github_reporter_status": str(TELEMETRY_GITHUB_REPORTER_FILE),
         },
     }
 
@@ -655,6 +669,209 @@ def _write_failure_packet(packet: dict[str, Any], capture_regression: bool = Fal
         log(f"failure packet write failed: {exc!r}")
 
 
+
+_github_report_lock = threading.Lock()
+
+
+def _github_should_report(packet: dict[str, Any]) -> bool:
+    return (
+        GITHUB_FAILURE_REPORTING
+        and bool(GITHUB_FAILURE_REPO)
+        and packet.get("classification") == "controller_bug"
+        and bool(packet.get("regression_id"))
+    )
+
+
+def _github_cli_path() -> str:
+    found = shutil.which("gh")
+    if found:
+        return found
+    candidates = [
+        LOCALAPPDATA / "Microsoft" / "WinGet" / "Links" / "gh.exe",
+        Path(os.environ.get("ProgramFiles", "C:\\Program Files")) / "GitHub CLI" / "gh.exe",
+    ]
+    for candidate in candidates:
+        if candidate.exists():
+            return str(candidate)
+    return ""
+
+
+def _github_run(args: list[str]) -> subprocess.CompletedProcess[str]:
+    kwargs: dict[str, Any] = {
+        "capture_output": True,
+        "text": True,
+        "encoding": "utf-8",
+        "errors": "replace",
+        "timeout": max(5, GITHUB_FAILURE_TIMEOUT),
+    }
+    if os.name == "nt" and hasattr(subprocess, "CREATE_NO_WINDOW"):
+        kwargs["creationflags"] = subprocess.CREATE_NO_WINDOW
+    return subprocess.run(args, **kwargs)
+
+
+def _github_reporter_status(status: str, **fields: Any) -> None:
+    try:
+        payload = {
+            "schema_version": TELEMETRY_SCHEMA_VERSION,
+            "generated_at": time.time(),
+            "controller_version": VERSION,
+            "status": status,
+            "repo": GITHUB_FAILURE_REPO,
+            **fields,
+        }
+        _atomic_write_json(TELEMETRY_GITHUB_REPORTER_FILE, payload)
+    except Exception as exc:
+        log(f"github reporter status write failed: {exc!r}")
+
+
+def _github_failure_issue_body(packet: dict[str, Any]) -> str:
+    safe = _telemetry_sanitize(packet)
+    regression_id = str(safe.get("regression_id") or "")
+    summary = {
+        "controller_version": safe.get("version"),
+        "classification": safe.get("classification"),
+        "kind": safe.get("kind"),
+        "message": safe.get("message"),
+        "tool_name": safe.get("tool_name"),
+        "studio_mode": safe.get("studio_mode"),
+        "mutation_epoch": safe.get("mutation_epoch"),
+        "play_session": safe.get("play_session"),
+        "next_required_action": safe.get("next_required_action"),
+        "current_blocker": safe.get("current_blocker"),
+        "gate": safe.get("gate"),
+        "verified_evidence": safe.get("verified_evidence"),
+        "action_history_tail": safe.get("action_history_tail"),
+    }
+    packet_json = json.dumps(summary, ensure_ascii=False, indent=2, default=str)
+    return (
+        f"<!-- qwen-controller-regression-id:{regression_id} -->\n"
+        "# Automated controller failure\n\n"
+        "This issue was created automatically by the local Qwen Roblox controller. "
+        "The payload is telemetry-sanitized before upload.\n\n"
+        f"- **Regression ID:** {regression_id}\n"
+        f"- **Controller:** {safe.get('version')}\n"
+        f"- **Classification:** {safe.get('classification')}\n"
+        f"- **Kind:** {safe.get('kind')}\n\n"
+        "## Failure packet\n\n"
+        "~~~json\n"
+        f"{packet_json}\n"
+        "~~~\n"
+    )
+
+
+def _report_failure_to_github(packet: dict[str, Any]) -> None:
+    if not _github_should_report(packet):
+        return
+    regression_id = str(packet.get("regression_id") or "")
+    with _github_report_lock:
+        gh = _github_cli_path()
+        if not gh:
+            _github_reporter_status(
+                "gh_missing",
+                regression_id=regression_id,
+                detail="Install GitHub CLI and authenticate once with gh auth login.",
+            )
+            return
+
+        try:
+            auth = _github_run([gh, "auth", "status"])
+        except Exception as exc:
+            _github_reporter_status("auth_check_failed", regression_id=regression_id, detail=str(exc)[:500])
+            return
+        if auth.returncode != 0:
+            _github_reporter_status(
+                "gh_not_authenticated",
+                regression_id=regression_id,
+                detail="GitHub CLI is installed but not authenticated. Run gh auth login once.",
+            )
+            return
+
+        try:
+            existing = _github_run([
+                gh, "issue", "list",
+                "--repo", GITHUB_FAILURE_REPO,
+                "--state", "all",
+                "--search", f"{regression_id} in:body",
+                "--json", "number,url,title",
+                "--limit", "5",
+            ])
+            if existing.returncode == 0:
+                rows = json.loads(existing.stdout or "[]")
+                if isinstance(rows, list) and rows:
+                    _github_reporter_status(
+                        "already_reported",
+                        regression_id=regression_id,
+                        issue_url=str(rows[0].get("url") or ""),
+                    )
+                    return
+        except Exception as exc:
+            log(f"github issue dedupe search failed: {exc!r}")
+
+        title = f"[AUTO-FAILURE] {packet.get('kind') or 'controller_bug'} [{regression_id}]"
+        body = _github_failure_issue_body(packet)
+        body_path = TELEMETRY_DIR / f".github_issue_{regression_id}.md"
+        try:
+            body_path.write_text(body, encoding="utf-8")
+            args = [
+                gh, "issue", "create",
+                "--repo", GITHUB_FAILURE_REPO,
+                "--title", title,
+                "--body-file", str(body_path),
+            ]
+            if GITHUB_FAILURE_LABEL:
+                args += ["--label", GITHUB_FAILURE_LABEL]
+            created = _github_run(args)
+            label_applied = bool(GITHUB_FAILURE_LABEL)
+            if created.returncode != 0 and GITHUB_FAILURE_LABEL:
+                created = _github_run([
+                    gh, "issue", "create",
+                    "--repo", GITHUB_FAILURE_REPO,
+                    "--title", title,
+                    "--body-file", str(body_path),
+                ])
+                label_applied = False
+
+            if created.returncode == 0:
+                issue_url = (created.stdout or "").strip().splitlines()[-1] if (created.stdout or "").strip() else ""
+                _github_reporter_status(
+                    "reported",
+                    regression_id=regression_id,
+                    issue_url=issue_url,
+                    label_applied=label_applied,
+                )
+            else:
+                _github_reporter_status(
+                    "create_failed",
+                    regression_id=regression_id,
+                    detail=(created.stderr or created.stdout or "unknown gh error")[:1000],
+                )
+        except Exception as exc:
+            _github_reporter_status("report_failed", regression_id=regression_id, detail=str(exc)[:1000])
+        finally:
+            try:
+                body_path.unlink(missing_ok=True)
+            except Exception:
+                pass
+
+
+def _queue_github_failure_report(packet: dict[str, Any]) -> None:
+    if not _github_should_report(packet):
+        return
+    try:
+        threading.Thread(
+            target=_report_failure_to_github,
+            args=(copy.deepcopy(packet),),
+            daemon=True,
+            name="qwen-github-failure-reporter",
+        ).start()
+    except Exception as exc:
+        _github_reporter_status(
+            "queue_failed",
+            regression_id=str(packet.get("regression_id") or ""),
+            detail=str(exc)[:500],
+        )
+
+
 def _detect_block_deadlock(reason: str, name: str, args: dict[str, Any] | None) -> tuple[str, str] | None:
     with _state_lock:
         state = copy.deepcopy(STATE)
@@ -745,6 +962,7 @@ def telemetry_record_failure(
         state_update(mutate)
         packet = _compact_failure_packet(kind, message, tool_name, arguments or {}, state_copy)
         _write_failure_packet(packet, capture_regression=packet.get("classification") == "controller_bug")
+        _queue_github_failure_report(packet)
         refresh_telemetry_files()
         return failure_id
     except Exception as exc:
@@ -3949,6 +4167,19 @@ def self_test_main() -> int:
     packet = _compact_failure_packet("controller_state_conflict", "gate/blocker conflict", "start_stop_play", {"is_start": True}, conflict_state)
     if packet.get("classification") != "controller_bug" or not packet.get("regression_id"):
         failures.append(f"compact failure packet invalid: {packet}")
+
+    # V6.3 regression: controller-bug packets are eligible for automatic
+    # GitHub handoff, while non-controller failures are not.
+    report_packet = dict(packet)
+    if not _github_should_report(report_packet):
+        failures.append("controller_bug packet was not eligible for GitHub reporting")
+    no_report_packet = dict(report_packet)
+    no_report_packet["classification"] = "runtime_or_tool_error"
+    if _github_should_report(no_report_packet):
+        failures.append("non-controller failure was incorrectly eligible for GitHub reporting")
+    issue_body = _github_failure_issue_body(report_packet)
+    if str(report_packet.get("regression_id")) not in issue_body or "controller_bug" not in issue_body:
+        failures.append("GitHub failure issue body omitted required regression metadata")
 
     if failures:
         telemetry_write_test_results({
