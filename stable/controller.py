@@ -39,8 +39,8 @@ import urllib.request
 from pathlib import Path
 from typing import Any
 
-APP_NAME = "Qwen Roblox Enforced Proxy V6.3.8"
-VERSION = "6.3.8"
+APP_NAME = "Qwen Roblox Enforced Proxy V6.3.9"
+VERSION = "6.3.9"
 
 LOCALAPPDATA = Path(os.environ.get("LOCALAPPDATA", str(Path.home())))
 STATE_DIR = LOCALAPPDATA / "QwenRobloxEnforcedProxy"
@@ -109,7 +109,7 @@ GITHUB_HEARTBEAT_REPO = os.environ.get(
     "QWEN_GITHUB_HEARTBEAT_REPO",
     "lucaluxa0-sys/roblox-proxy",
 ).strip()
-GITHUB_HEARTBEAT_INTERVAL = max(60, int(os.environ.get("QWEN_GITHUB_HEARTBEAT_INTERVAL", "120")))
+GITHUB_HEARTBEAT_INTERVAL = max(60, int(os.environ.get("QWEN_GITHUB_HEARTBEAT_INTERVAL", "60")))
 GITHUB_HEARTBEAT_TITLE = os.environ.get(
     "QWEN_GITHUB_HEARTBEAT_TITLE",
     "[AUTO-HEARTBEAT] Qwen Roblox Agent",
@@ -949,7 +949,7 @@ _PUBLIC_LONG_TOKEN_RE = re.compile(r"\b[A-Za-z0-9+/_=-]{64,}\b")
 _PUBLIC_LOG_ALLOW_RE = re.compile(
     r"(?i)(?:"
     r"\[AUTOPILOT\]|MCP READY|HEADLESS (?:SESSION|ROLLOVER) PROMPT SENT|"
-    r"TASK_COMPLETE|cycle=|rollover|generation|restart|controller|manager|"
+    r"TASK_COMPLETE|BENCH:|BENCH_BATCH_COMPLETE|cycle=|rollover|generation|restart|controller|manager|"
     r"model|tool error|result_error|mcp|warn|error|fail|connected|disconnected"
     r")"
 )
@@ -1163,6 +1163,41 @@ def _public_model_updater_state(raw: dict[str, Any]) -> dict[str, Any]:
     return out
 
 
+
+_BENCH_MARKER_RE = re.compile(
+    r"\[BENCH:(S\d{3}):(PASS|PARTIAL|FAIL)(?::([^\]]{0,500}))?\]",
+    re.IGNORECASE,
+)
+_BENCH_BATCH_RE = re.compile(r"\[BENCH_BATCH_COMPLETE:([^\]]{1,160})\]", re.IGNORECASE)
+
+
+def _benchmark_progress_from_events(events: list[str]) -> dict[str, Any]:
+    by_id: dict[str, dict[str, Any]] = {}
+    batches: list[str] = []
+    for line in events:
+        text = str(line or "")
+        for match in _BENCH_MARKER_RE.finditer(text):
+            test_id = match.group(1).upper()
+            status = match.group(2).upper()
+            reason = _public_safe_string(match.group(3) or "", 500)
+            by_id[test_id] = {"status": status, "reason": reason}
+        for match in _BENCH_BATCH_RE.finditer(text):
+            batch = _public_safe_string(match.group(1), 160)
+            if batch and batch not in batches:
+                batches.append(batch)
+    passed = sum(1 for row in by_id.values() if row.get("status") == "PASS")
+    partial = sum(1 for row in by_id.values() if row.get("status") == "PARTIAL")
+    failed = sum(1 for row in by_id.values() if row.get("status") == "FAIL")
+    return {
+        "tests_seen": len(by_id),
+        "pass": passed,
+        "partial": partial,
+        "fail": failed,
+        "batch_complete_markers": batches[-10:],
+        "results": dict(sorted(by_id.items())[-100:]),
+    }
+
+
 def _diagnostic_snapshot() -> dict[str, Any]:
     install_dir = LOCALAPPDATA / "QwenRobloxAgent"
     full_auto = _read_json_file_safe(install_dir / "full_auto_health.json")
@@ -1175,6 +1210,8 @@ def _diagnostic_snapshot() -> dict[str, Any]:
         state = copy.deepcopy(STATE)
     with _health_lock:
         health = copy.deepcopy(_CONTROLLER_HEALTH)
+
+    autopilot_events = _safe_autopilot_log_tail()
 
     snapshot = {
         "schema_version": 1,
@@ -1222,7 +1259,8 @@ def _diagnostic_snapshot() -> dict[str, Any]:
         },
         "recent_actions": [_public_action_row(x) for x in action_rows],
         "recent_failures": [_public_failure_row(x) for x in failure_rows],
-        "recent_autopilot_events": _safe_autopilot_log_tail(),
+        "recent_autopilot_events": autopilot_events,
+        "benchmark_progress": _benchmark_progress_from_events(autopilot_events),
         "qwen_visibility": {
             "visible_outputs": (
                 "Only metadata/events already written to local logs are published here. "
@@ -5342,6 +5380,19 @@ def self_test_main() -> int:
     })
     if not projected_runner.get("include_task") or projected_runner.get("task_instance_id") != "e2e-123":
         failures.append(f"V6.3.8 heartbeat lost runner task dispatch fields: {projected_runner!r}")
+
+    # V6.3.9 regression: benchmark progress markers must survive the
+    # heartbeat parser so remote go-check can score a live batch.
+    bench_progress = _benchmark_progress_from_events([
+        "[BENCH:S001:PASS]",
+        "[BENCH:S002:PARTIAL:missing runtime proof]",
+        "[BENCH:S003:FAIL:MODEL wrong result]",
+        "[BENCH_BATCH_COMPLETE:script-01-a]",
+    ])
+    if bench_progress.get("pass") != 1 or bench_progress.get("partial") != 1 or bench_progress.get("fail") != 1:
+        failures.append(f"V6.3.9 benchmark marker counts wrong: {bench_progress!r}")
+    if "script-01-a" not in (bench_progress.get("batch_complete_markers") or []):
+        failures.append(f"V6.3.9 benchmark batch marker missing: {bench_progress!r}")
 
     # V6.3 regression: controller-bug packets are eligible for automatic
     # GitHub handoff, while non-controller failures are not.
