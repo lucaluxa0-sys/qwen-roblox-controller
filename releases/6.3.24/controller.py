@@ -6871,6 +6871,10 @@ def self_test_main() -> int:
         failures.append("V6.3.18 wrong benchmark Script creation incorrectly matched missing target")
     benchmark_missing_state = new_state()
     benchmark_missing_state["studio_mode"] = "edit"
+    benchmark_missing_state["qwen_decision_trace_gate"] = {
+        "last_at": time.time(),
+        "consumed": False,
+    }
     benchmark_missing_state["current_blocker"] = {
         "classification": "benchmark_script_missing",
         "path": missing_target,
@@ -6920,6 +6924,10 @@ def self_test_main() -> int:
     }
     missing_state_6320 = new_state()
     missing_state_6320["studio_mode"] = "edit"
+    missing_state_6320["qwen_decision_trace_gate"] = {
+        "last_at": time.time(),
+        "consumed": False,
+    }
     missing_state_6320["current_blocker"] = {
         "classification": "benchmark_script_missing",
         "path": missing_target_6320,
