@@ -39,8 +39,8 @@ import urllib.request
 from pathlib import Path
 from typing import Any
 
-APP_NAME = "Qwen Roblox Enforced Proxy V6.3.29"
-VERSION = "6.3.29"
+APP_NAME = "Qwen Roblox Enforced Proxy V6.3.30"
+VERSION = "6.3.30"
 
 LOCALAPPDATA = Path(os.environ.get("LOCALAPPDATA", str(Path.home())))
 STATE_DIR = LOCALAPPDATA / "QwenRobloxEnforcedProxy"
@@ -5377,6 +5377,98 @@ SUPERVISOR_RESUME_TOOL = {
 }
 
 
+SUPERVISOR_STOP_LOCAL_QWEN_STACK_TOOL = {
+    "name": "supervisor_stop_local_qwen_stack",
+    "description": (
+        "User-authorized local shutdown. Stops the Qwen full-auto manager, autonomous runner, "
+        "and LM Studio llama-server backend after returning this tool result. Roblox Studio and the LM Studio GUI are not closed. "
+        "Requires the exact confirmation string STOP_LOCAL_QWEN_STACK."
+    ),
+    "inputSchema": {
+        "type": "object",
+        "required": ["confirm"],
+        "properties": {
+            "confirm": {
+                "type": "string",
+                "description": "Must be exactly STOP_LOCAL_QWEN_STACK."
+            }
+        },
+        "additionalProperties": False,
+    },
+}
+
+
+def _powershell_executable() -> str:
+    found = shutil.which("powershell.exe") or shutil.which("powershell")
+    if found:
+        return found
+    system_root = Path(os.environ.get("SystemRoot", r"C:\\Windows"))
+    return str(system_root / "System32" / "WindowsPowerShell" / "v1.0" / "powershell.exe")
+
+
+def _local_qwen_stop_script() -> str:
+    # Exclude the helper PowerShell process itself: its command line contains
+    # the literal target regexes below, so without $_.ProcessId -ne $PID it
+    # could select/kill itself before reaching the real targets.
+    return r"""
+Start-Sleep -Seconds 2
+$targets = Get-CimInstance Win32_Process | Where-Object {
+    if ($_.ProcessId -eq $PID) { return $false }
+    $cmd = [string]$_.CommandLine
+    $exe = [string]$_.ExecutablePath
+    (
+        ($_.Name -ieq 'llama-server.exe' -and ($cmd -match '\\.lmstudio\\extensions\\backends\\' -or $exe -match '\\.lmstudio\\extensions\\backends\\')) -or
+        ($cmd -match 'qwen_full_auto_manager\.py') -or
+        ($cmd -match 'qwen_direct_autopilot_runner\.py') -or
+        ($cmd -match 'qwen_autopilot_runner\.py')
+    )
+}
+$targets | Sort-Object ProcessId -Descending | ForEach-Object {
+    try { Stop-Process -Id $_.ProcessId -Force -ErrorAction Stop } catch {}
+}
+"""
+
+
+def _schedule_stop_local_qwen_stack() -> tuple[dict[str, Any] | None, str | None]:
+    if os.name != "nt":
+        return None, "supervisor_stop_local_qwen_stack is Windows-only."
+    kwargs: dict[str, Any] = {
+        "stdin": subprocess.DEVNULL,
+        "stdout": subprocess.DEVNULL,
+        "stderr": subprocess.DEVNULL,
+    }
+    flags = 0
+    flags |= getattr(subprocess, "CREATE_NO_WINDOW", 0)
+    flags |= getattr(subprocess, "DETACHED_PROCESS", 0)
+    flags |= getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
+    kwargs["creationflags"] = flags
+    try:
+        subprocess.Popen(
+            [
+                _powershell_executable(),
+                "-NoProfile",
+                "-ExecutionPolicy",
+                "Bypass",
+                "-Command",
+                _local_qwen_stop_script(),
+            ],
+            **kwargs,
+        )
+    except Exception as exc:
+        return None, f"Could not schedule local Qwen stack shutdown: {exc!r}"
+    return {
+        "accepted": True,
+        "scheduled": True,
+        "delay_seconds": 2,
+        "stops": [
+            "qwen_full_auto_manager.py",
+            "qwen_direct_autopilot_runner.py / qwen_autopilot_runner.py",
+            "LM Studio llama-server.exe under .lmstudio\\extensions\\backends",
+        ],
+        "preserves": ["Roblox Studio", "LM Studio GUI"],
+    }, None
+
+
 SUPERVISOR_DECISION_TRACE_TOOL = {
     "name": "supervisor_decision_trace",
     "description": (
@@ -5643,6 +5735,8 @@ def augment_tools_list(response: dict[str, Any]) -> dict[str, Any]:
             tools.append(SUPERVISOR_STATUS_TOOL)
         if "supervisor_resume" not in seen:
             tools.append(SUPERVISOR_RESUME_TOOL)
+        if "supervisor_stop_local_qwen_stack" not in seen:
+            tools.append(SUPERVISOR_STOP_LOCAL_QWEN_STACK_TOOL)
         if "supervisor_decision_trace" not in seen:
             tools.append(SUPERVISOR_DECISION_TRACE_TOOL)
         if "supervisor_benchmark_record" not in seen:
@@ -6008,6 +6102,18 @@ def handle_parent_message(child: subprocess.Popen[str], message: dict[str, Any])
             packet = build_resume_packet()
             if "id" in message:
                 emit(mcp_tool_ok_response(request_id, packet))
+            return
+        if name == "supervisor_stop_local_qwen_stack":
+            if str(args.get("confirm") or "") != "STOP_LOCAL_QWEN_STACK":
+                if "id" in message:
+                    emit(mcp_tool_error_response(request_id, "Exact confirmation STOP_LOCAL_QWEN_STACK is required."))
+                return
+            payload, stop_reason = _schedule_stop_local_qwen_stack()
+            if "id" in message:
+                if stop_reason:
+                    emit(mcp_tool_error_response(request_id, stop_reason))
+                else:
+                    emit(mcp_tool_ok_response(request_id, payload))
             return
         if name == "supervisor_decision_trace":
             payload, trace_reason = _record_qwen_decision_trace(args)
@@ -7203,6 +7309,23 @@ def self_test_main() -> int:
     }, ["[BENCH:S080:PASS:original evidence]"])
     if not immutable_reason_same_6328 or "evidence reason" not in immutable_reason_same_6328:
         failures.append(f"V6.3.28 same-status result reason could be rewritten: {immutable_reason_same_6328!r}")
+
+    # V6.3.30 regression: local shutdown remains explicit and narrowly scoped.
+    if SUPERVISOR_STOP_LOCAL_QWEN_STACK_TOOL.get("name") != "supervisor_stop_local_qwen_stack":
+        failures.append("V6.3.30 local shutdown tool name drifted")
+    stop_schema_6330 = SUPERVISOR_STOP_LOCAL_QWEN_STACK_TOOL.get("inputSchema") or {}
+    if stop_schema_6330.get("required") != ["confirm"]:
+        failures.append(f"V6.3.30 shutdown confirmation schema invalid: {stop_schema_6330!r}")
+    stop_script_6330 = _local_qwen_stop_script()
+    for required_text_6330 in (
+        "$_.ProcessId -eq $PID",
+        "llama-server.exe",
+        "qwen_full_auto_manager\\.py",
+        "qwen_direct_autopilot_runner\\.py",
+        "qwen_autopilot_runner\\.py",
+    ):
+        if required_text_6330 not in stop_script_6330:
+            failures.append(f"V6.3.30 shutdown script missing scope guard {required_text_6330!r}")
 
     # V6.3.18 regression: a benchmark Script proven missing in confirmed Edit mode
     # has one deterministic recovery: exact create_instances bootstrap, then reread.
