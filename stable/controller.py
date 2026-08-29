@@ -39,8 +39,8 @@ import urllib.request
 from pathlib import Path
 from typing import Any
 
-APP_NAME = "Qwen Roblox Enforced Proxy V6.3.14"
-VERSION = "6.3.14"
+APP_NAME = "Qwen Roblox Enforced Proxy V6.3.15"
+VERSION = "6.3.15"
 
 LOCALAPPDATA = Path(os.environ.get("LOCALAPPDATA", str(Path.home())))
 STATE_DIR = LOCALAPPDATA / "QwenRobloxEnforcedProxy"
@@ -1192,6 +1192,11 @@ def _benchmark_progress_from_events(events: list[str]) -> dict[str, Any]:
 
         match = _BENCH_PACK_RE.fullmatch(text)
         if match:
+            # Completion without any earlier concrete test result is not proof.
+            # This specifically rejects standalone marker lines copied from a
+            # task prompt before the model has emitted real BENCH results.
+            if not by_id:
+                continue
             pack = _public_safe_string(match.group(1), 160)
             if pack and pack not in packs:
                 packs.append(pack)
@@ -1199,6 +1204,8 @@ def _benchmark_progress_from_events(events: list[str]) -> dict[str, Any]:
 
         match = _BENCH_BATCH_RE.fullmatch(text)
         if match:
+            if not by_id:
+                continue
             batch = _public_safe_string(match.group(1), 160)
             if batch and batch not in batches:
                 batches.append(batch)
@@ -5565,6 +5572,29 @@ def self_test_main() -> int:
         failures.append(f"V6.3.10 pack completion marker missing: {bench_progress!r}")
     if "real-batch" not in (bench_progress.get("batch_complete_markers") or []):
         failures.append(f"V6.3.10 real batch completion marker missing: {bench_progress!r}")
+
+    # V6.3.15 regression: even a syntactically standalone completion marker
+    # from prompt/task text must not count before any concrete S### result exists.
+    prompt_only_completion = _benchmark_progress_from_events([
+        "[BENCH_PACK_COMPLETE:SP01]",
+        "[BENCH_BATCH_COMPLETE:prompt-only-batch]",
+    ])
+    if prompt_only_completion.get("pack_complete_markers") or prompt_only_completion.get("batch_complete_markers"):
+        failures.append(
+            f"V6.3.15 prompt-only standalone completion markers were counted: {prompt_only_completion!r}"
+        )
+    ordered_completion = _benchmark_progress_from_events([
+        "[BENCH_BATCH_COMPLETE:too-early]",
+        "[BENCH:S001:PASS]",
+        "[BENCH_PACK_COMPLETE:SP01]",
+        "[BENCH_BATCH_COMPLETE:real-after-result]",
+    ])
+    if "too-early" in (ordered_completion.get("batch_complete_markers") or []):
+        failures.append(f"V6.3.15 early batch marker counted before results: {ordered_completion!r}")
+    if "SP01" not in (ordered_completion.get("pack_complete_markers") or []):
+        failures.append(f"V6.3.15 valid pack marker after result was lost: {ordered_completion!r}")
+    if "real-after-result" not in (ordered_completion.get("batch_complete_markers") or []):
+        failures.append(f"V6.3.15 valid batch marker after result was lost: {ordered_completion!r}")
 
     # V6.3.11 regression: new Script creation has one safe deterministic
     # bootstrap path. Arbitrary or empty Source creation is blocked.
