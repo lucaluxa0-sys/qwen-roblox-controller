@@ -1,11 +1,11 @@
 {
   "schema_version": 1,
-  "version": "6.3.22",
+  "version": "6.3.23",
   "channel": "stable",
-  "controller_path": "releases/6.3.22/controller.py",
-  "release_path": "releases/6.3.22/controller.py",
-  "sha256": "aef93e448341da6cae809a3c7804642befac83fae377870374c5ca70a7cc84aa",
-  "published_at": "2026-08-29T09:10:00Z",
-  "notes": "Adds full scripting certification enforcement: SP01-SP21 pack validation, distinct legacy S001-S024 and full S001-S280 batch gates, complete-event validation independent of heartbeat truncation, and expanded benchmark event history for 280-test certification.",
-  "url": "https://raw.githubusercontent.com/lucaluxa0-sys/qwen-roblox-controller/main/releases/6.3.22/controller.py"
+  "controller_path": "releases/6.3.23/controller.py",
+  "release_path": "releases/6.3.23/controller.py",
+  "sha256": "d4e01cd0ab798fb801f2fb1af31173d0f3993598dcd6f0171c592a89031d53b3",
+  "published_at": "2026-08-29T10:30:22Z",
+  "notes": "Adds structured Qwen decision-trace telemetry via supervisor_decision_trace, publishes bounded recent decision summaries in the diagnostic heartbeat, and preserves completed benchmark harnesses for inspection. Hidden chain-of-thought is not captured.",
+  "url": "https://raw.githubusercontent.com/lucaluxa0-sys/qwen-roblox-controller/main/releases/6.3.23/controller.py"
 }
