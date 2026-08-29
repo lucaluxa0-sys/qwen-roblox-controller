@@ -39,8 +39,8 @@ import urllib.request
 from pathlib import Path
 from typing import Any
 
-APP_NAME = "Qwen Roblox Enforced Proxy V6.3.2"
-VERSION = "6.3.2"
+APP_NAME = "Qwen Roblox Enforced Proxy V6.3.3"
+VERSION = "6.3.3"
 
 LOCALAPPDATA = Path(os.environ.get("LOCALAPPDATA", str(Path.home())))
 STATE_DIR = LOCALAPPDATA / "QwenRobloxEnforcedProxy"
@@ -404,6 +404,11 @@ def next_required_action_from_state(state: dict[str, Any]) -> str:
     if isinstance(gate, dict):
         stage = gate.get("stage")
         target = gate.get("target") or "the edited script"
+        if stage == "need_runtime_verify":
+            missing = runtime_requirement_message(gate.get("runtime_requirements") or {}, state)
+            if mode != "play":
+                return "Start Play to continue runtime verification, then " + missing + "."
+            return missing + "."
         return {
             "need_reread": f"Reread {target}.",
             "repair_allowed": f"Repair only the verified structural defect in {target}, then reread.",
@@ -895,6 +900,13 @@ def _detect_block_deadlock(reason: str, name: str, args: dict[str, Any] | None) 
             sigs = [x.get("sig") for x in same_state[-DEADLOCK_REPEAT_LIMIT:]]
             notes = [str(x.get("note") or "") for x in same_state[-DEADLOCK_REPEAT_LIMIT:]]
             if len(set(sigs)) <= 2 or len(set(notes)) <= 2:
+                # A satisfiable runtime-verification gate with an explicit missing
+                # evidence path is a model/policy loop, not a controller deadlock.
+                # Do not auto-escalate it as controller_bug just because Qwen
+                # ignored the exact required inspection a few times.
+                if isinstance(gate, dict) and gate.get("stage") == "need_runtime_verify":
+                    missing = runtime_requirement_message(gate.get("runtime_requirements") or {}, state)
+                    return ("model_policy_loop", "Repeated blocked actions while runtime verification remained satisfiable. Exact missing evidence: " + missing)
                 return ("controller_deadlock", f"Detected {len(same_state)} blocked actions with no mutation/play progress. Stop retrying this loop and review the failure packet.")
     return None
 
@@ -2503,16 +2515,42 @@ def runtime_requirements_satisfied(state: dict[str, Any], req: dict[str, Any] | 
     return True
 
 
-def runtime_requirement_message(req: dict[str, Any] | None) -> str:
+def runtime_requirement_message(req: dict[str, Any] | None, state: dict[str, Any] | None = None) -> str:
+    """Describe only the runtime evidence that is still missing when state is available."""
     req = req or {}
+    ev = (state or {}).get("runtime_evidence") or {}
     bits: list[str] = []
+
     if req.get("head_scale"):
-        bits.append("re-inspect runtime Head.Size and Humanoid scaling state")
-    if req.get("body_geometry"):
-        bits.append("re-inspect at least one non-Head body BasePart Size")
+        if not ev.get("head_seen"):
+            bits.append("inspect runtime Head.Size")
+        if not ev.get("humanoid_seen"):
+            bits.append("inspect the runtime Humanoid scaling state (Humanoid / BodyDepthScale / HeadScale / AutomaticScalingEnabled / RigType)")
+
+    if req.get("body_geometry") and not ev.get("non_head_body_size_seen"):
+        bits.append("inspect at least one non-Head body BasePart Size")
+
     if req.get("accessory"):
-        bits.append("re-inspect an actual Accessory.Handle and Handle.Size")
-    return "; ".join(bits) if bits else "gather the required post-edit runtime evidence"
+        if not ev.get("accessory_seen"):
+            bits.append("inspect an actual runtime Accessory")
+        if not ev.get("handle_seen"):
+            bits.append("inspect that Accessory.Handle")
+        elif not ev.get("handle_size_seen"):
+            bits.append("inspect that Accessory.Handle Size")
+
+    if bits:
+        return "; ".join(bits)
+
+    # Backward-compatible wording for callers without state and for already
+    # satisfied requirements.
+    configured: list[str] = []
+    if req.get("head_scale"):
+        configured.append("re-inspect runtime Head.Size and Humanoid scaling state")
+    if req.get("body_geometry"):
+        configured.append("re-inspect at least one non-Head body BasePart Size")
+    if req.get("accessory"):
+        configured.append("re-inspect an actual Accessory.Handle and Handle.Size")
+    return "; ".join(configured) if configured else "gather the required post-edit runtime evidence"
 
 def visual_change_likely(name: str, args: dict[str, Any] | None, target: str = "") -> bool:
     text = norm(joined_payload(args) + " " + target)
@@ -2961,12 +2999,18 @@ def block_reason_for_call(name: str, args: dict[str, Any] | None) -> str | None:
             req = gate.get("runtime_requirements") or {}
             if n in (READ_EVIDENCE_TOOLS - {"script_read", "read_script_range", "get_studio_state"}):
                 required_action = True
+            elif n == "start_stop_play" and args.get("is_start") is False:
+                # Safe escape: never trap Studio in Play forever. Evidence survives
+                # the mode switch and the same gate resumes on the next Play.
+                required_action = True
+            elif mode != "play" and n == "start_stop_play" and args.get("is_start") is True:
+                required_action = True
             elif n in {"supervisor_status", "supervisor_resume", "get_studio_state", "list_roblox_studios"}:
                 required_action = True
             else:
                 return (
                     "Blocked by V6 exact-next-action gate: post-edit runtime evidence is required before visual verification or another write. "
-                    + runtime_requirement_message(req) + ". Use direct Studio evidence; do not speculate."
+                    + runtime_requirement_message(req, state) + ". Use direct Studio evidence; do not speculate."
                 )
 
         elif stage == "need_visual":
@@ -3168,6 +3212,16 @@ def on_tool_result(name: str, args: dict[str, Any] | None, response: dict[str, A
                     b["stage"] = "need_source_read"
             state_update(syntax_stopped)
             notes.append("Play is stopped. Read the implicated script now; one narrow syntax repair will then be allowed.")
+        else:
+            with _state_lock:
+                gate_after_stop = copy.deepcopy(STATE.get("gate"))
+            if isinstance(gate_after_stop, dict) and gate_after_stop.get("stage") == "need_runtime_verify":
+                notes.append(
+                    "Play is stopped as a safe escape. Runtime verification is paused, not discarded. "
+                    "MANDATORY NEXT: Start Play again, then "
+                    + runtime_requirement_message(gate_after_stop.get("runtime_requirements") or {}, STATE)
+                    + "."
+                )
 
     # Any successful script mutation creates a mandatory verification gate.
     if tool_is_script_mutation(name, args) and not is_error:
@@ -3427,7 +3481,7 @@ def on_tool_result(name: str, args: dict[str, Any] | None, response: dict[str, A
             if isinstance(gate, dict) and gate.get("stage") == "need_runtime_verify":
                 notes.append(
                     "No relevant runtime error detected. MANDATORY NEXT: "
-                    + runtime_requirement_message(gate.get("runtime_requirements"))
+                    + runtime_requirement_message(gate.get("runtime_requirements"), STATE)
                     + ". Do not visually verify or write again until these post-edit measurements are recorded."
                 )
             elif isinstance(gate, dict) and gate.get("stage") == "need_visual":
@@ -4213,6 +4267,39 @@ def self_test_main() -> int:
         with _state_lock:
             STATE.clear()
             STATE.update(saved_state)
+
+    # V6.3.3 regression: runtime verification should name only missing
+    # evidence and must always permit a safe Stop-Play escape.
+    runtime_state = new_state()
+    runtime_state["studio_mode"] = "play"
+    runtime_state["runtime_evidence"]["head_seen"] = True
+    runtime_state["runtime_evidence"]["non_head_body_size_seen"] = True
+    runtime_state["runtime_evidence"]["humanoid_seen"] = False
+    runtime_state["gate"] = {
+        "stage": "need_runtime_verify",
+        "target": "game.ServerScriptService.Test",
+        "runtime_requirements": {"head_scale": True, "body_geometry": True, "accessory": False},
+        "visual": True,
+    }
+    msg = runtime_requirement_message(runtime_state["gate"]["runtime_requirements"], runtime_state)
+    if "Humanoid scaling state" not in msg or "Head.Size" in msg or "non-Head" in msg:
+        failures.append(f"V6.3.3 missing runtime evidence message was not precise: {msg!r}")
+
+    with _state_lock:
+        saved_state_633 = copy.deepcopy(STATE)
+        STATE.clear()
+        STATE.update(copy.deepcopy(runtime_state))
+    try:
+        reason = block_reason_for_call("start_stop_play", {"is_start": False})
+        if reason:
+            failures.append(f"V6.3.3 safe Stop-Play escape was blocked during runtime verification: {reason}")
+        dead = _detect_block_deadlock("loop", "start_stop_play", {"is_start": False})
+        if dead and dead[0] == "controller_deadlock":
+            failures.append(f"V6.3.3 satisfiable runtime gate was misclassified as controller deadlock: {dead}")
+    finally:
+        with _state_lock:
+            STATE.clear()
+            STATE.update(saved_state_633)
 
     # V6.3 regression: controller-bug packets are eligible for automatic
     # GitHub handoff, while non-controller failures are not.
