@@ -1,28 +1,13 @@
-Task-Instance: run6-postcomplete-output-retry-20260829T0910Z
+Task-Instance: run6-recovery-complete-hold-for-6.3.22-20260829T0912Z
 
-RUN6 REMAINS CONTROLLER-VERIFIED COMPLETE: 24/24 PASS, SP01+SP02 complete, starter batch marker accepted.
+RUN6 IS CONTROLLER-VERIFIED COMPLETE: 24/24 PASS.
+The accidental post-completion edit has been reread, playtested, Output-verified, Play stopped, and the controller gate is clear.
 
-CURRENT STATE:
-- Play is already running.
-- Controller gate is need_output for:
-  ServerScriptService.__QWEN_SCRIPT_BENCH__.SP02_ScriptingTests
-- A previous get_console_output call errored, then list_roblox_studios succeeded.
+DO NOT CALL ANY ROBLOX STUDIO TOOL.
+DO NOT CALL ANY BENCHMARK TOOL.
+DO NOT mutate, inspect, playtest, clean up, or rerun SP01/SP02.
 
-ONLY RECOVERY:
-1. Retry get_console_output on the currently connected Studio exactly once.
-2. If it succeeds with no relevant runtime error, stop Play exactly once.
-3. If the controller gate is then clear, emit exactly:
-   [TASK_COMPLETE]
-4. Stop.
+ONLY ACTION:
+[TASK_COMPLETE]
 
-If get_console_output errors again, do NOT mutate anything and do NOT start another Play session. Stop and leave the gate for supervisor intervention.
-
-FORBIDDEN:
-- script_read while Play is running
-- multi_edit
-- execute_luau
-- create_instances
-- any source mutation
-- benchmark reporting
-- SP01/SP02 reruns
-- cleanup mutation
+Then stop. Supervisor will issue SP03 only after controller 6.3.22 is live.
