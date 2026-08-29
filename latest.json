@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
-  "version": "6.3.19",
+  "version": "6.3.20",
   "channel": "stable",
-  "controller_path": "releases/6.3.19/controller.py",
-  "release_path": "releases/6.3.19/controller.py",
-  "sha256": "fe0a4017c37b9d7f6d43c0d0a66d1aa5ac24171c3b6c5956722989d973394a7a",
-  "published_at": "2026-08-29T08:15:39Z",
-  "notes": "Adds privacy-safe Qwen performance telemetry to the private heartbeat. A 1-second local sampler records per-cycle prompt/completion tokens, runner numeric timing metrics, native completion tok/s when available, and a clearly labeled observed cycle-wall tok/s fallback that includes tool/runner overhead. Heartbeat includes rolling min/avg/max and recent samples for before/after performance comparisons. Preserves 6.3.18 deterministic benchmark Script creation recovery and 6.3.17 structured benchmark reporting."
+  "controller_path": "releases/6.3.20/controller.py",
+  "release_path": "releases/6.3.20/controller.py",
+  "sha256": "63a3cebde1aabfe969b18618e21d047fd2e6fe53375c2b09bd99ed55df3e5358",
+  "published_at": "2026-08-29T08:24:51Z",
+  "notes": "Aligns missing benchmark Script creation with the current built-in Roblox Studio MCP. When an exact benchmark path has already been proven missing in Edit mode, one multi_edit may create it only by replacing empty source with the inert QWEN controller bootstrap. Arbitrary create-time source remains blocked. Successful bootstrap creation clears the stale missing blocker but still requires authoritative script_read before the real transactional harness edit. Preserves structured benchmark reporting and performance telemetry."
 }
