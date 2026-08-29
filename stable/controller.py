@@ -39,8 +39,8 @@ import urllib.request
 from pathlib import Path
 from typing import Any
 
-APP_NAME = "Qwen Roblox Enforced Proxy V6.3.19"
-VERSION = "6.3.19"
+APP_NAME = "Qwen Roblox Enforced Proxy V6.3.20"
+VERSION = "6.3.20"
 
 LOCALAPPDATA = Path(os.environ.get("LOCALAPPDATA", str(Path.home())))
 STATE_DIR = LOCALAPPDATA / "QwenRobloxEnforcedProxy"
@@ -2448,15 +2448,27 @@ def _benchmark_missing_script_create_matches(args: dict[str, Any] | None, target
     return matched
 
 
+def _benchmark_missing_script_bootstrap_multi_edit(args: dict[str, Any] | None, target: str) -> bool:
+    """Recognize the official MCP's safe create-via-multi_edit bootstrap transaction."""
+    actual = extract_target(args or {})
+    if not target_matches(target, actual):
+        return False
+    pairs = _generic_edit_pairs(args or {})
+    return (
+        len(pairs) == 1
+        and pairs[0][0] == ""
+        and normalize_source(pairs[0][1]) == SCRIPT_BOOTSTRAP_SOURCE
+    )
+
+
 def _benchmark_missing_script_message(target: str) -> str:
     wanted = canonical_target(target)
-    name = wanted.split(".")[-1] if wanted else "the missing benchmark Script"
-    parent = ".".join(wanted.split(".")[:-1]) if "." in wanted else "ServerScriptService.__QWEN_SCRIPT_BENCH__"
     return (
         f"Benchmark Script {wanted or target} is confirmed missing in Edit mode. "
-        f"Use create_instances to create Script name={name!r} parent={parent!r} with Source exactly "
-        f"{SCRIPT_BOOTSTRAP_SOURCE!r}. Then script_read that exact path before any multi_edit. "
-        "Do not multi_edit a nonexistent Script and do not use execute_luau to create it."
+        "The official Roblox Studio MCP creates a missing Script through multi_edit. "
+        f"Use exactly one multi_edit on this same path with old_string='' and new_string={SCRIPT_BOOTSTRAP_SOURCE!r}. "
+        "No other source is allowed for creation. Then script_read that exact path before replacing the bootstrap with the real harness. "
+        "Do not use execute_luau to create the Script or assign Script.Source."
     )
 
 
@@ -3408,6 +3420,29 @@ def build_expected_source(name: str, args: dict[str, Any] | None) -> tuple[str |
             "Blocked by V5 transaction invariant: script mutation has no deterministic target path. "
             "Use a script edit tool with an explicit script path/target."
         ), []
+
+    # The built-in Roblox MCP documents multi_edit as the script-creation path
+    # when a target does not exist. Permit that only after the controller has
+    # already proven this exact benchmark path missing in Edit mode, and only
+    # when the resulting source is the inert bootstrap line.
+    with _state_lock:
+        active_blocker = copy.deepcopy(STATE.get("current_blocker"))
+    missing_bootstrap = (
+        n == "multi_edit"
+        and isinstance(active_blocker, dict)
+        and active_blocker.get("classification") == "benchmark_script_missing"
+        and _benchmark_missing_script_bootstrap_multi_edit(args, active_blocker.get("path") or target)
+    )
+    if missing_bootstrap:
+        candidate = SCRIPT_BOOTSTRAP_SOURCE
+        defects = structural_source_defects(candidate, "", args, name)
+        if defects:
+            return candidate, (
+                "Blocked by V5 compiler transaction: the safe benchmark bootstrap proposal failed deterministic preflight. "
+                + " | ".join(defects)
+            ), defects
+        return candidate, None, []
+
     if not source_cache_has(target):
         return None, (
             f"Blocked by V5 transaction invariant: no authoritative source snapshot is cached for {target}. "
@@ -4242,8 +4277,8 @@ def block_reason_for_call(name: str, args: dict[str, Any] | None) -> str | None:
                 required_action = True
             elif n == "script_read" and target_matches(bpath, extract_target(args)):
                 required_action = True
-            elif n == "create_instances":
-                if _benchmark_missing_script_create_matches(args, bpath):
+            elif n == "multi_edit":
+                if _benchmark_missing_script_bootstrap_multi_edit(args, bpath):
                     required_action = True
                 else:
                     return _benchmark_missing_script_message(bpath)
@@ -4403,9 +4438,18 @@ def block_reason_for_call(name: str, args: dict[str, Any] | None) -> str | None:
         return bad
 
     # Existing-script edits must be grounded in a current source snapshot.
+    # The one exception is a benchmark Script already proven absent in Edit mode:
+    # Roblox's official multi_edit creates a missing Script, but only the inert
+    # bootstrap creation transaction is permitted without a prior source snapshot.
     if tool_is_script_mutation(name, args):
         target = extract_target(args)
-        if target and n in SCRIPT_MUTATION_NAMES and not source_cache_has(target):
+        missing_bootstrap = (
+            isinstance(blocker, dict)
+            and blocker.get("classification") == "benchmark_script_missing"
+            and n == "multi_edit"
+            and _benchmark_missing_script_bootstrap_multi_edit(args, blocker.get("path") or target)
+        )
+        if target and n in SCRIPT_MUTATION_NAMES and not source_cache_has(target) and not missing_bootstrap:
             return (
                 f"Blocked: no authoritative source is cached for {target}. "
                 "Call script_read first, then edit the source that actually exists in Studio."
@@ -4702,8 +4746,18 @@ def on_tool_result(name: str, args: dict[str, Any] | None, response: dict[str, A
             if not structural_repair and not bootstrap_initialization:
                 invalidate_runtime_evidence_for_mutation(state, name, args)
             if isinstance(prior_blocker, dict):
-                prior_blocker["stage"] = "repair_applied"
-                state["current_blocker"] = prior_blocker
+                if (
+                    bootstrap_initialization
+                    and prior_blocker.get("classification") == "benchmark_script_missing"
+                    and target_matches(prior_blocker.get("path") or "", target)
+                ):
+                    # The missing object now exists. The need_reread gate above is
+                    # sufficient and mandatory; keeping the old missing blocker
+                    # would incorrectly block the real harness edit after reread.
+                    state["current_blocker"] = None
+                else:
+                    prior_blocker["stage"] = "repair_applied"
+                    state["current_blocker"] = prior_blocker
         state_update(after_edit)
         notes.append(f"MANDATORY NEXT: re-read {target} before any further write. Current source on reread is authoritative.")
 
@@ -6398,19 +6452,71 @@ def self_test_main() -> int:
         STATE.clear()
         STATE.update(copy.deepcopy(benchmark_missing_state))
     try:
-        allowed_reason = block_reason_for_call("create_instances", correct_bootstrap_create)
+        allowed_reason = block_reason_for_call(
+            "multi_edit",
+            {
+                "file_path": missing_target,
+                "edits": [{"old_string": "", "new_string": SCRIPT_BOOTSTRAP_SOURCE, "replace_all": False}],
+                "datamodel_type": "Edit",
+            },
+        )
         if allowed_reason:
-            failures.append(f"V6.3.18 exact bootstrap creation was blocked: {allowed_reason!r}")
+            failures.append(f"V6.3.18/20 exact bootstrap creation transaction was blocked: {allowed_reason!r}")
         bad_edit_reason = block_reason_for_call(
             "multi_edit",
             {"file_path": missing_target, "edits": [{"old_string": "", "new_string": "print(1)"}]},
         )
-        if not bad_edit_reason or "create_instances" not in bad_edit_reason:
-            failures.append(f"V6.3.18 nonexistent benchmark multi_edit lacked create guidance: {bad_edit_reason!r}")
+        if not bad_edit_reason or "old_string=''" not in bad_edit_reason:
+            failures.append(f"V6.3.18/20 nonexistent benchmark multi_edit lacked safe bootstrap guidance: {bad_edit_reason!r}")
     finally:
         with _state_lock:
             STATE.clear()
             STATE.update(saved_state_6318)
+
+    # V6.3.20 regression: the current built-in Roblox MCP creates a missing
+    # Script through multi_edit, so the controller must permit exactly the inert
+    # bootstrap transaction after the path was proven missing, and reject all
+    # arbitrary create-time source.
+    missing_target_6320 = "ServerScriptService.__QWEN_SCRIPT_BENCH__.SP02_ScriptingTests"
+    safe_create_edit_6320 = {
+        "file_path": missing_target_6320,
+        "edits": [{"old_string": "", "new_string": SCRIPT_BOOTSTRAP_SOURCE, "replace_all": False}],
+        "datamodel_type": "Edit",
+    }
+    unsafe_create_edit_6320 = {
+        "file_path": missing_target_6320,
+        "edits": [{"old_string": "", "new_string": "print('blind create')", "replace_all": False}],
+        "datamodel_type": "Edit",
+    }
+    missing_state_6320 = new_state()
+    missing_state_6320["studio_mode"] = "edit"
+    missing_state_6320["current_blocker"] = {
+        "classification": "benchmark_script_missing",
+        "path": missing_target_6320,
+        "stage": "need_create_bootstrap",
+        "message": "missing",
+    }
+    with _state_lock:
+        saved_state_6320 = copy.deepcopy(STATE)
+        STATE.clear()
+        STATE.update(copy.deepcopy(missing_state_6320))
+    try:
+        safe_gate_reason = block_reason_for_call("multi_edit", safe_create_edit_6320)
+        if safe_gate_reason:
+            failures.append(f"V6.3.20 safe missing-Script bootstrap multi_edit was blocked: {safe_gate_reason!r}")
+        candidate_6320, reason_6320, defects_6320 = build_expected_source("multi_edit", safe_create_edit_6320)
+        if reason_6320 or candidate_6320 != SCRIPT_BOOTSTRAP_SOURCE or defects_6320:
+            failures.append(
+                f"V6.3.20 safe missing-Script bootstrap simulation failed: "
+                f"candidate={candidate_6320!r} reason={reason_6320!r} defects={defects_6320!r}"
+            )
+        unsafe_gate_reason = block_reason_for_call("multi_edit", unsafe_create_edit_6320)
+        if not unsafe_gate_reason or "old_string=''" not in unsafe_gate_reason:
+            failures.append(f"V6.3.20 arbitrary missing-Script source was not blocked with bootstrap guidance: {unsafe_gate_reason!r}")
+    finally:
+        with _state_lock:
+            STATE.clear()
+            STATE.update(saved_state_6320)
 
     # V6.3.14 regression: after a benchmark target is known, pathless whole-tree
     # enumeration is blocked to avoid multi-thousand-token prompt explosions.
