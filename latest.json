@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
-  "version": "6.3.16",
+  "version": "6.3.17",
   "channel": "stable",
-  "controller_path": "releases/6.3.16/controller.py",
-  "release_path": "releases/6.3.16/controller.py",
-  "sha256": "4b4341098a6827d2940536edfb12c241f0f6d39656550ff00c496e2ab270b39c",
-  "published_at": "2026-08-29T07:59:03Z",
-  "notes": "Pins the immutable 6.3.16 release artifact. Rejects no-op script transactions before Roblox MCP; bootstrap-to-bootstrap edits now return deterministic guidance to replace the inert bootstrap with real harness content. Includes 6.3.15 BENCH completion-proof parsing, 6.3.14 benchmark whole-tree context guard, and 6.3.13 inert-bootstrap runtime-gate exemption."
+  "controller_path": "releases/6.3.17/controller.py",
+  "release_path": "releases/6.3.17/controller.py",
+  "sha256": "284bc0b65b5dce4de38def84153fbcbb3f832bad6366c9d24324bf9078a7c3f7",
+  "published_at": "2026-08-29T08:04:48Z",
+  "notes": "Adds controller-owned structured benchmark reporting via supervisor_benchmark_record. Benchmark decisions are stored as run-scoped controller telemetry; SP01/SP02 completion is rejected until every capability in the pack has a concrete decision, batch completion requires S001-S024 plus both packs, and heartbeat scoring prefers controller-verified records over fragile printed/logged marker text. Preserves 6.3.16 no-op transaction rejection and prior benchmark guardrails."
 }
