@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
-  "version": "6.3.6",
+  "version": "6.3.7",
   "channel": "stable",
   "controller_path": "stable/controller.py",
-  "release_path": "releases/6.3.6/controller.py",
-  "sha256": "3e48150197a57d23dc3ebe8216216fe517e9c22ff02b8cfc42c935727406b6f4",
-  "published_at": "2026-08-29T06:09:45Z",
-  "notes": "Automatic diagnostic heartbeat to the private roblox-proxy repository for remote health and recent-session inspection."
+  "release_path": "releases/6.3.7/controller.py",
+  "sha256": "1cc3ab33cbc1d536820d041e2715247e089d5489407c5be9504d40571f03b9f4",
+  "published_at": "2026-08-29T06:15:52Z",
+  "notes": "Private diagnostic heartbeat plus automatic hash-verified bootstrap of the Qwen model auto-updater. The model updater checks every 5 minutes, can self-update, downloads a declared LM Studio model before switching, changes only managed model settings, and lets the full-auto manager reload and resume the autopilot."
 }
