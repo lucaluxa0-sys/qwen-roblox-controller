@@ -39,8 +39,8 @@ import urllib.request
 from pathlib import Path
 from typing import Any
 
-APP_NAME = "Qwen Roblox Enforced Proxy V6.3.16"
-VERSION = "6.3.16"
+APP_NAME = "Qwen Roblox Enforced Proxy V6.3.17"
+VERSION = "6.3.17"
 
 LOCALAPPDATA = Path(os.environ.get("LOCALAPPDATA", str(Path.home())))
 STATE_DIR = LOCALAPPDATA / "QwenRobloxEnforcedProxy"
@@ -1170,6 +1170,8 @@ _BENCH_MARKER_RE = re.compile(
 )
 _BENCH_BATCH_RE = re.compile(r"\[BENCH_BATCH_COMPLETE:([^\]]{1,160})\]", re.IGNORECASE)
 _BENCH_PACK_RE = re.compile(r"\[BENCH_PACK_COMPLETE:([^\]]{1,160})\]", re.IGNORECASE)
+_BENCH_RUN_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,159}$")
+_BENCH_TEST_ID_RE = re.compile(r"^S\d{3}$", re.IGNORECASE)
 
 
 def _benchmark_progress_from_events(events: list[str]) -> dict[str, Any]:
@@ -1224,6 +1226,119 @@ def _benchmark_progress_from_events(events: list[str]) -> dict[str, Any]:
     }
 
 
+def _benchmark_events_for_run(rows: list[dict[str, Any]], run_id: str) -> list[str]:
+    out: list[str] = []
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        if row.get("event_kind") != "benchmark_record":
+            continue
+        if str(row.get("benchmark_run_id") or "") != run_id:
+            continue
+        event = str(row.get("event") or "").strip()
+        if (
+            _BENCH_MARKER_RE.fullmatch(event)
+            or _BENCH_PACK_RE.fullmatch(event)
+            or _BENCH_BATCH_RE.fullmatch(event)
+        ):
+            out.append(event)
+    return out
+
+
+def _latest_verified_benchmark_events(rows: list[dict[str, Any]]) -> tuple[str, list[str]]:
+    run_id = ""
+    for row in rows:
+        if not isinstance(row, dict) or row.get("event_kind") != "benchmark_record":
+            continue
+        candidate = str(row.get("benchmark_run_id") or "").strip()
+        if _BENCH_RUN_ID_RE.fullmatch(candidate):
+            run_id = candidate
+    if not run_id:
+        return "", []
+    return run_id, _benchmark_events_for_run(rows, run_id)
+
+
+def _validate_benchmark_record_request(
+    args: dict[str, Any],
+    existing_events: list[str] | None = None,
+) -> tuple[list[str], str | None]:
+    run_id = str((args or {}).get("run_id") or "").strip()
+    if not _BENCH_RUN_ID_RE.fullmatch(run_id):
+        return [], "Benchmark run_id is required and must use only letters, digits, dot, underscore, colon, or hyphen."
+
+    raw_results = (args or {}).get("results")
+    if raw_results is None:
+        raw_results = []
+    if not isinstance(raw_results, list) or len(raw_results) > 64:
+        return [], "Benchmark results must be an array with at most 64 rows."
+
+    markers: list[str] = []
+    seen_ids: set[str] = set()
+    for row in raw_results:
+        if not isinstance(row, dict):
+            return [], "Each benchmark result row must be an object."
+        test_id = str(row.get("test_id") or "").upper().strip()
+        status = str(row.get("status") or "").upper().strip()
+        reason = str(row.get("reason") or "").strip()
+        if not _BENCH_TEST_ID_RE.fullmatch(test_id):
+            return [], f"Invalid benchmark test_id {test_id!r}; expected S###."
+        if status not in {"PASS", "PARTIAL", "FAIL"}:
+            return [], f"Invalid status for {test_id}: {status!r}."
+        if test_id in seen_ids:
+            return [], f"Duplicate benchmark result for {test_id} in one submission."
+        seen_ids.add(test_id)
+        reason = reason.replace("\r", " ").replace("\n", " ").replace("]", ")")[:500]
+        marker = f"[BENCH:{test_id}:{status}" + (f":{reason}" if reason else "") + "]"
+        markers.append(marker)
+
+    pack_values = (args or {}).get("pack_complete")
+    if pack_values is None:
+        pack_values = []
+    if isinstance(pack_values, str):
+        pack_values = [pack_values]
+    if not isinstance(pack_values, list) or len(pack_values) > 10:
+        return [], "pack_complete must be a string or an array with at most 10 pack IDs."
+    packs = [str(x or "").strip() for x in pack_values if str(x or "").strip()]
+
+    batch = str((args or {}).get("batch_complete") or "").strip()
+    if batch and (len(batch) > 160 or "]" in batch or "\n" in batch or "\r" in batch):
+        return [], "batch_complete contains unsupported characters or is too long."
+
+    events = list(existing_events or []) + markers
+    progress = _benchmark_progress_from_events(events)
+    decided = set(progress.get("results") or {})
+
+    required_by_pack = {
+        "SP01": {f"S{i:03d}" for i in range(1, 13)},
+        "SP02": {f"S{i:03d}" for i in range(13, 25)},
+    }
+    for pack in packs:
+        if len(pack) > 160 or "]" in pack or "\n" in pack or "\r" in pack:
+            return [], f"Invalid pack ID {pack!r}."
+        required = required_by_pack.get(pack.upper())
+        if required and not required.issubset(decided):
+            missing = sorted(required - decided)
+            return [], f"{pack} cannot complete; missing concrete decisions: {', '.join(missing)}."
+        markers.append(f"[BENCH_PACK_COMPLETE:{pack}]")
+        events.append(markers[-1])
+        progress = _benchmark_progress_from_events(events)
+
+    if batch:
+        required_all = {f"S{i:03d}" for i in range(1, 25)}
+        decided = set(progress.get("results") or {})
+        completed_packs = {str(x).upper() for x in (progress.get("pack_complete_markers") or [])}
+        if not required_all.issubset(decided):
+            missing = sorted(required_all - decided)
+            return [], f"Batch cannot complete; missing concrete decisions: {', '.join(missing)}."
+        if not {"SP01", "SP02"}.issubset(completed_packs):
+            return [], "Batch cannot complete until both SP01 and SP02 completion records exist."
+        markers.append(f"[BENCH_BATCH_COMPLETE:{batch}]")
+
+    if not markers:
+        return [], "Submit at least one benchmark result, pack completion, or batch completion."
+    return markers, None
+
+
 def _diagnostic_snapshot() -> dict[str, Any]:
     install_dir = LOCALAPPDATA / "QwenRobloxAgent"
     full_auto = _read_json_file_safe(install_dir / "full_auto_health.json")
@@ -1238,6 +1353,18 @@ def _diagnostic_snapshot() -> dict[str, Any]:
         health = copy.deepcopy(_CONTROLLER_HEALTH)
 
     autopilot_events = _safe_autopilot_log_tail()
+    benchmark_rows = _tail_jsonl_safe(TELEMETRY_AUTOPILOT_FILE, 300)
+    verified_benchmark_run_id, verified_benchmark_events = _latest_verified_benchmark_events(benchmark_rows)
+    benchmark_score_events = verified_benchmark_events if verified_benchmark_events else autopilot_events
+    benchmark_progress = _benchmark_progress_from_events(benchmark_score_events)
+    if verified_benchmark_run_id:
+        benchmark_progress["run_id"] = verified_benchmark_run_id
+        benchmark_progress["source"] = "controller_verified"
+    displayed_autopilot_events = list(autopilot_events)
+    for event in verified_benchmark_events[-40:]:
+        if event not in displayed_autopilot_events:
+            displayed_autopilot_events.append(event)
+    displayed_autopilot_events = displayed_autopilot_events[-max(GITHUB_HEARTBEAT_LOG_TAIL, 60):]
 
     snapshot = {
         "schema_version": 1,
@@ -1285,8 +1412,8 @@ def _diagnostic_snapshot() -> dict[str, Any]:
         },
         "recent_actions": [_public_action_row(x) for x in action_rows],
         "recent_failures": [_public_failure_row(x) for x in failure_rows],
-        "recent_autopilot_events": autopilot_events,
-        "benchmark_progress": _benchmark_progress_from_events(autopilot_events),
+        "recent_autopilot_events": displayed_autopilot_events,
+        "benchmark_progress": benchmark_progress,
         "qwen_visibility": {
             "visible_outputs": (
                 "Only metadata/events already written to local logs are published here. "
@@ -4541,6 +4668,81 @@ SUPERVISOR_RESUME_TOOL = {
 }
 
 
+SUPERVISOR_BENCHMARK_RECORD_TOOL = {
+    "name": "supervisor_benchmark_record",
+    "description": (
+        "Controller-owned benchmark reporting. After real evidence exists, submit multiple S### decisions in one structured call. "
+        "Use this instead of printing BENCH markers through execute_luau. SP01/SP02 completion is rejected until every capability "
+        "in that pack has a concrete decision; batch completion is rejected until S001-S024 and both packs are complete."
+    ),
+    "inputSchema": {
+        "type": "object",
+        "required": ["run_id"],
+        "properties": {
+            "run_id": {"type": "string", "description": "Exact Benchmark-Run-ID from the task."},
+            "results": {
+                "type": "array",
+                "maxItems": 64,
+                "items": {
+                    "type": "object",
+                    "required": ["test_id", "status"],
+                    "properties": {
+                        "test_id": {"type": "string", "description": "Capability ID such as S001."},
+                        "status": {"type": "string", "enum": ["PASS", "PARTIAL", "FAIL"]},
+                        "reason": {"type": "string"},
+                    },
+                    "additionalProperties": False,
+                },
+            },
+            "pack_complete": {
+                "type": "array",
+                "maxItems": 10,
+                "items": {"type": "string"},
+                "description": "Pack IDs proven complete in this submission, for example [SP01].",
+            },
+            "batch_complete": {"type": "string", "description": "Batch ID, only after all required results and packs exist."},
+        },
+        "additionalProperties": False,
+    },
+}
+
+
+def _record_benchmark_submission(args: dict[str, Any]) -> tuple[dict[str, Any] | None, str | None]:
+    run_id = str((args or {}).get("run_id") or "").strip()
+    rows = _tail_jsonl_safe(TELEMETRY_AUTOPILOT_FILE, 300)
+    existing = _benchmark_events_for_run(rows, run_id)
+    markers, reason = _validate_benchmark_record_request(args or {}, existing)
+    if reason:
+        return None, reason
+
+    now = time.time()
+    try:
+        with _telemetry_lock:
+            for marker in markers:
+                _append_jsonl(TELEMETRY_AUTOPILOT_FILE, {
+                    "schema_version": TELEMETRY_SCHEMA_VERSION,
+                    "event": marker,
+                    "event_kind": "benchmark_record",
+                    "benchmark_run_id": run_id,
+                    "source": "supervisor_benchmark_record",
+                    "at": now,
+                    "controller_version": VERSION,
+                })
+        refresh_telemetry_files()
+    except Exception as exc:
+        return None, f"Could not persist benchmark records: {exc!r}"
+
+    progress = _benchmark_progress_from_events(existing + markers)
+    progress["run_id"] = run_id
+    progress["source"] = "controller_verified"
+    return {
+        "accepted": True,
+        "run_id": run_id,
+        "markers_recorded": markers,
+        "benchmark_progress": progress,
+    }, None
+
+
 def augment_tools_list(response: dict[str, Any]) -> dict[str, Any]:
     try:
         result = response.get("result")
@@ -4582,6 +4784,8 @@ def augment_tools_list(response: dict[str, Any]) -> dict[str, Any]:
             tools.append(SUPERVISOR_STATUS_TOOL)
         if "supervisor_resume" not in seen:
             tools.append(SUPERVISOR_RESUME_TOOL)
+        if "supervisor_benchmark_record" not in seen:
+            tools.append(SUPERVISOR_BENCHMARK_RECORD_TOOL)
         return response
     except Exception as exc:
         log(f"augment tools failed: {exc!r}")
@@ -4941,6 +5145,14 @@ def handle_parent_message(child: subprocess.Popen[str], message: dict[str, Any])
             packet = build_resume_packet()
             if "id" in message:
                 emit(mcp_tool_ok_response(request_id, packet))
+            return
+        if name == "supervisor_benchmark_record":
+            payload, record_reason = _record_benchmark_submission(args)
+            if "id" in message:
+                if record_reason:
+                    emit(mcp_tool_error_response(request_id, record_reason))
+                else:
+                    emit(mcp_tool_ok_response(request_id, payload))
             return
 
         reason = block_reason_for_call(name, args)
@@ -5709,6 +5921,34 @@ def self_test_main() -> int:
             f"V6.3.16 bootstrap no-op was not deterministically blocked: "
             f"candidate={noop_candidate!r} reason={noop_reason!r}"
         )
+
+    # V6.3.17 regression: structured benchmark records are run-scoped and pack
+    # completion cannot be declared until every capability in the pack is decided.
+    sp01_rows = [
+        {"test_id": f"S{i:03d}", "status": "PASS", "reason": "verified"}
+        for i in range(1, 13)
+    ]
+    sp01_markers, sp01_reason = _validate_benchmark_record_request({
+        "run_id": "selftest-run",
+        "results": sp01_rows,
+        "pack_complete": ["SP01"],
+    }, [])
+    if sp01_reason or len(sp01_markers) != 13 or sp01_markers[-1] != "[BENCH_PACK_COMPLETE:SP01]":
+        failures.append(f"V6.3.17 valid SP01 structured record rejected: {sp01_reason!r} {sp01_markers!r}")
+    _, early_pack_reason = _validate_benchmark_record_request({
+        "run_id": "selftest-run",
+        "results": [{"test_id": "S001", "status": "PASS"}],
+        "pack_complete": ["SP01"],
+    }, [])
+    if not early_pack_reason or "missing concrete decisions" not in early_pack_reason:
+        failures.append(f"V6.3.17 premature SP01 completion was not rejected: {early_pack_reason!r}")
+    fake_rows = [
+        {"event": "[BENCH:S001:PASS]", "event_kind": "benchmark_record", "benchmark_run_id": "old-run"},
+        {"event": "[BENCH:S013:PASS]", "event_kind": "benchmark_record", "benchmark_run_id": "new-run"},
+    ]
+    latest_run, latest_events = _latest_verified_benchmark_events(fake_rows)
+    if latest_run != "new-run" or latest_events != ["[BENCH:S013:PASS]"]:
+        failures.append(f"V6.3.17 benchmark run scoping failed: {latest_run!r} {latest_events!r}")
 
     # V6.3.14 regression: after a benchmark target is known, pathless whole-tree
     # enumeration is blocked to avoid multi-thousand-token prompt explosions.
