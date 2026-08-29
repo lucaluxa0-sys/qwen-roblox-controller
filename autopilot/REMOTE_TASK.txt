@@ -1,17 +1,20 @@
-Task-Instance: hold-for-stop-button-6.3.31-20260829T0542PT
+Task-Instance: hold-for-power-buttons-6.3.32-20260829T0559PT
 
-USER WANTS A CLICKABLE STOP BUTTON INSTALLED BEFORE THE LOCAL QWEN STACK IS ENDED.
+USER REQUESTED PAIRED QWEN POWER OFF / POWER ON CONTROLS.
 
 DO NOT call Roblox Studio tools.
 DO NOT resume benchmarks.
-DO NOT call supervisor_stop_local_qwen_stack yet.
+DO NOT call supervisor_stop_local_qwen_stack.
+DO NOT actually power off the stack.
+
+Controller 6.3.32 has been published but must be proven live before installation.
 
 ONLY:
 1. If supervisor_decision_trace is available, record:
-   goal="Wait for clickable Stop Qwen button controller"
-   evidence=["user requested the stop button be installed before shutdown"]
-   decision="Do not shut down until controller 6.3.31 is live"
-   next_action="await updated task"
+   goal="Wait for Qwen Power Off / Power On controller"
+   evidence=["user requested paired Power Off and Power On controls","controller 6.3.32 must be live before install"]
+   decision="Do not shut down or touch Roblox while waiting"
+   next_action="await supervisor task after heartbeat proves 6.3.32 live"
    confidence="high"
 2. Emit [TASK_COMPLETE]
 3. Stop.
