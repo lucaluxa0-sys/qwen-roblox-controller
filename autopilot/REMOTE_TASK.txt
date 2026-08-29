@@ -1,73 +1,69 @@
-Benchmark-Run-ID: scripting-s001-s024-grouped-run2-20260829T0654Z
-Metadata note: the Benchmark-Run-ID is NOT a Roblox studio_id and must never be passed to a Studio tool.
+Benchmark-Run-ID: scripting-s001-s024-bootstrap-run3-20260829T0724Z
+This run ID is metadata only. NEVER use it as studio_id.
 
-Run Qwen Roblox Capability Suite 01 — Scripting / Luau, grouped batch S001-S024.
+Run Scripting/Luau benchmark S001-S024 as two grouped packs: SP01=S001-S012 and SP02=S013-S024.
 
-GOAL:
-Prove 24 individual scripting capabilities efficiently using TWO grouped capability packs, not 24 independent Studio missions.
+FIRST:
+- supervisor_resume(new_chat=true).
+- Work only in the actually connected Studio. If studio_id is stale, call list_roblox_studios and use the real connected ID.
+- Be in Edit mode before script_read/edit work.
+- Do not touch existing user content.
 
-PACK SP01 — S001-S012:
-- Build one shared benchmark harness/source where possible.
-- Execute multiple deterministic assertions in the same Play session.
-- Use extra benchmark-created source only for cases that truly require source-repair/syntax evidence.
-- After all twelve tests are individually decided, emit the pack-complete marker using the documented BENCH_PACK_COMPLETE format with pack id SP01.
-
-PACK SP02 — S013-S024:
-- Reuse shared benchmark infrastructure where safe.
-- Execute the scope/types/nil assertions together.
-- Minimize source rewrites and Play start/stop transitions.
-- After all twelve tests are individually decided, emit the pack-complete marker using the documented BENCH_PACK_COMPLETE format with pack id SP02.
-
-SAFETY / ISOLATION:
-- Call supervisor_resume(new_chat=true) first.
-- If a saved studio_id is stale, call list_roblox_studios and use an actual connected Studio ID. Never use the Benchmark-Run-ID or a Task/Pack identifier as studio_id.
-- Do not modify existing user scripts, instances, settings, assets, or player data.
-- Create benchmark artifacts only under ServerStorage.__QWEN_SCRIPT_BENCH__ and, only when runtime execution is required, ServerScriptService.__QWEN_SCRIPT_BENCH__.
-- You may create/edit/run/inspect/delete only benchmark-created artifacts.
-- Follow controller gates, authoritative rereads, Output checks, and runtime verification requirements.
-- Do not bypass script mutation policy by using execute_luau to write Script.Source.
-- Clean up every benchmark artifact at the end.
+MANDATORY NEW-SCRIPT SEQUENCE — DO NOT IMPROVISE:
+For each pack harness, use one benchmark-created Script under ServerScriptService.__QWEN_SCRIPT_BENCH__.
+1. Ensure benchmark Folder exists using the normal instance-creation tool.
+2. If the pack Script does not exist, create it with Source EXACTLY:
+-- QWEN_CONTROLLER_SCRIPT_BOOTSTRAP
+3. Immediately script_read the exact new Script path.
+4. Only after that successful script_read, use the official transactional script edit tool to replace the exact bootstrap line with the full pack harness.
+5. Immediately script_read the exact path again to verify authoritative source.
+6. Start Play only when runtime evidence is needed; collect labeled Output for multiple tests in one pass.
+7. Stop Play before further source edits.
+8. NEVER use execute_luau to write Script.Source.
+9. If controller says source is not cached, do NOT retry the mutation. Perform script_read first.
+10. If a repair test would require intentionally creating invalid source that the guardrail refuses, mark that test PARTIAL:UNSAFE and continue instead of fighting the controller.
 
 EFFICIENCY:
-- 280 catalog entries are capabilities, not 280 separate runs.
-- Shared setup, shared source, shared Play sessions, and shared Output retrieval are preferred whenever they still provide unambiguous evidence.
-- One Output pass may prove many assertions if each assertion is labeled with its test ID.
-- Do not stop/restart Play between tests unless required by evidence or controller policy.
+- One harness per pack, not one script per test.
+- One Play session / Output retrieval per pack when possible.
+- Harness Output must label assertions by S### so evidence maps to individual capabilities.
+- Do not repeatedly inspect or rewrite after evidence is already sufficient.
 
-RESULT PROTOCOL:
-For each concrete test S001 through S024, emit exactly one standalone result line using the BENCH result format. Use PASS only with authoritative evidence; otherwise PARTIAL or FAIL with MODEL, CONTROLLER, MCP, ENV, or UNSAFE reason.
-The result-format examples in this prompt are templates only and are not results.
+RESULTS:
+Emit one standalone real result per test:
+[BENCH:S###:PASS]
+or [BENCH:S###:PARTIAL:<reason>]
+or [BENCH:S###:FAIL:<MODEL|CONTROLLER|MCP|ENV|UNSAFE> <reason>]
+Only actual standalone result lines count.
 
-TESTS:
-- S001: Write valid Luau using arithmetic precedence, comparisons, booleans, strings, and parentheses; verify exact results.
-- S002: Repair one syntax error without changing unrelated behavior, then reread the authoritative source.
-- S003: Demonstrate the difference between assignment and equality comparison.
-- S004: Use and/or/not in a non-trivial expression and verify each branch.
-- S005: Use safe string formatting/interpolation with mixed numeric and string values.
-- S006: Handle division, modulo, negatives, and integer/floor behavior correctly.
-- S007: Use Luau compound assignment and verify the resulting state.
-- S008: Use comments and multiline strings without breaking parsing.
-- S009: Recognize and remove an operator copied from a non-Luau language.
-- S010: Construct an expression where evaluation order matters and prove the intended result.
-- S011: Use optional Luau type annotations without changing runtime behavior.
-- S012: Predict a short expression result first, execute it, and compare prediction to evidence.
-- S013: Demonstrate local scope without creating accidental globals.
-- S014: Demonstrate block shadowing and prove which value is read at each point.
-- S015: Safely handle a missing child returning nil before property access.
-- S016: Distinguish false from nil in branching.
-- S017: Use typeof and IsA appropriately for Roblox values and Instances.
-- S018: Guard an optional value before indexing it.
-- S019: Replace repeated magic values with named locals/constants.
-- S020: Use multiple assignment and multiple returns correctly.
-- S021: Use lexical capture of an outer local and verify mutation behavior.
-- S022: Avoid stale cached Instance references after destroy/recreate.
-- S023: Validate conversion between strings and numbers.
-- S024: Repair a declaration-order bug where a helper captures an unavailable local.
+SP01 objectives:
+S001 arithmetic precedence/comparisons/booleans/strings/parentheses.
+S002 repair one syntax error and reread authoritative source.
+S003 assignment vs equality.
+S004 non-trivial and/or/not branches.
+S005 safe string formatting/interpolation.
+S006 division/modulo/negatives/floor behavior.
+S007 compound assignment.
+S008 comments and multiline strings.
+S009 recognize/remove non-Luau operator.
+S010 evaluation order.
+S011 optional Luau type annotations.
+S012 predict expression, execute, compare.
 
-FINISH:
-- Confirm all 24 tests have a result.
-- Confirm SP01 and SP02 each have a real pack-complete marker.
-- Verify no benchmark artifacts remain.
-- Report PASS/PARTIAL/FAIL counts.
-- Emit the real batch-complete marker for run id scripting-s001-s024-grouped-run2 only after all above steps are complete.
-- When controller gate is clear, emit [TASK_COMPLETE].
+SP02 objectives:
+S013 local scope/no accidental globals.
+S014 block shadowing.
+S015 nil-safe missing child.
+S016 false vs nil.
+S017 typeof and IsA.
+S018 optional-value guard.
+S019 named constants instead of magic values.
+S020 multiple assignment/returns.
+S021 lexical closure mutation.
+S022 stale Instance reference after destroy/recreate.
+S023 string/number conversion validation.
+S024 declaration-order/closure repair.
+
+After S001-S012 are individually decided, emit standalone [BENCH_PACK_COMPLETE:SP01].
+After S013-S024 are individually decided, emit standalone [BENCH_PACK_COMPLETE:SP02].
+Then remove all benchmark-created artifacts, verify cleanup, emit standalone [BENCH_BATCH_COMPLETE:scripting-s001-s024-bootstrap-run3], and only with controller gate clear emit [TASK_COMPLETE].
