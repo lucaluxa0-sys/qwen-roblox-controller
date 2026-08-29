@@ -130,6 +130,10 @@ TELEMETRY_MAX_STRING = int(os.environ.get("QWEN_TELEMETRY_MAX_STRING", "12000"))
 TELEMETRY_HISTORY_TAIL = int(os.environ.get("QWEN_TELEMETRY_HISTORY_TAIL", "30"))
 QWEN_PERF_SAMPLER_INTERVAL = max(0.25, float(os.environ.get("QWEN_PERF_SAMPLER_INTERVAL", "1.0")))
 QWEN_PERF_HISTORY_TAIL = max(5, min(60, int(os.environ.get("QWEN_PERF_HISTORY_TAIL", "20"))))
+BENCHMARK_EVENT_HISTORY_ROWS = max(
+    400,
+    min(5000, int(os.environ.get("QWEN_BENCHMARK_EVENT_HISTORY_ROWS", "1200"))),
+)
 
 # Context management. In normal LM Studio UI/MCP mode the proxy cannot see the
 # model's private reasoning or the complete chat transcript, so the meter there
@@ -1647,7 +1651,7 @@ def _diagnostic_snapshot() -> dict[str, Any]:
         health = copy.deepcopy(_CONTROLLER_HEALTH)
 
     autopilot_events = _safe_autopilot_log_tail()
-    benchmark_rows = _tail_jsonl_safe(TELEMETRY_AUTOPILOT_FILE, 300)
+    benchmark_rows = _tail_jsonl_safe(TELEMETRY_AUTOPILOT_FILE, BENCHMARK_EVENT_HISTORY_ROWS)
     verified_benchmark_run_id, verified_benchmark_events = _latest_verified_benchmark_events(benchmark_rows)
     benchmark_score_events = verified_benchmark_events if verified_benchmark_events else autopilot_events
     benchmark_progress = _benchmark_progress_from_events(benchmark_score_events)
@@ -5178,7 +5182,7 @@ SUPERVISOR_BENCHMARK_RECORD_TOOL = {
 
 def _record_benchmark_submission(args: dict[str, Any]) -> tuple[dict[str, Any] | None, str | None]:
     run_id = str((args or {}).get("run_id") or "").strip()
-    rows = _tail_jsonl_safe(TELEMETRY_AUTOPILOT_FILE, 300)
+    rows = _tail_jsonl_safe(TELEMETRY_AUTOPILOT_FILE, BENCHMARK_EVENT_HISTORY_ROWS)
     existing = _benchmark_events_for_run(rows, run_id)
     markers, reason = _validate_benchmark_record_request(args or {}, existing)
     if reason:
