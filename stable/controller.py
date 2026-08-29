@@ -39,8 +39,8 @@ import urllib.request
 from pathlib import Path
 from typing import Any
 
-APP_NAME = "Qwen Roblox Enforced Proxy V6.3.10"
-VERSION = "6.3.10"
+APP_NAME = "Qwen Roblox Enforced Proxy V6.3.11"
+VERSION = "6.3.11"
 
 LOCALAPPDATA = Path(os.environ.get("LOCALAPPDATA", str(Path.home())))
 STATE_DIR = LOCALAPPDATA / "QwenRobloxEnforcedProxy"
@@ -1908,6 +1908,14 @@ SCRIPT_MUTATION_NAMES = {
     "replace_script",
 }
 
+# Safe bootstrap text for newly-created Scripts. New scripts may be created with
+# exactly this inert source, then script_read establishes authoritative source
+# and a normal transactional edit replaces it. This closes the create_instances
+# Source bypass while still making controller-approved new-script workflows
+# possible.
+SCRIPT_BOOTSTRAP_SOURCE = "-- QWEN_CONTROLLER_SCRIPT_BOOTSTRAP"
+SCRIPT_CLASSES = {"script", "localscript", "modulescript"}
+
 # Common Roblox tools which can mutate state but should not be mistaken for reads.
 KNOWN_MUTATION_NAMES = {
     "create_instances",
@@ -1962,6 +1970,68 @@ def tool_is_script_mutation(name: str, args: dict[str, Any] | None = None) -> bo
         if ".source" in t or "source =" in t or "source=" in t:
             return True
     return False
+
+
+def _script_creation_rows(value: Any) -> list[tuple[str, str | None]]:
+    """Return (class_name, source) for Script-like entries in create_instances payloads."""
+    rows: list[tuple[str, str | None]] = []
+
+    def walk(node: Any) -> None:
+        if isinstance(node, list):
+            for item in node:
+                walk(item)
+            return
+        if not isinstance(node, dict):
+            return
+
+        lowered = {str(k).lower(): v for k, v in node.items()}
+        cls = lowered.get("classname")
+        if cls is None:
+            cls = lowered.get("class_name")
+        if cls is None:
+            cls = lowered.get("class")
+
+        if isinstance(cls, str) and cls.lower() in SCRIPT_CLASSES:
+            source: str | None = None
+            direct = lowered.get("source")
+            if isinstance(direct, str):
+                source = direct
+            props = lowered.get("properties")
+            if isinstance(props, dict):
+                for key, val in props.items():
+                    if str(key).lower() == "source" and isinstance(val, str):
+                        source = val
+                        break
+            rows.append((cls, source))
+
+        for child in node.values():
+            if isinstance(child, (dict, list)):
+                walk(child)
+
+    walk(value)
+    return rows
+
+
+def script_creation_policy_reason(name: str, args: dict[str, Any] | None) -> str | None:
+    """Allow Script creation only through a tiny inert bootstrap source.
+
+    This gives the model a deterministic path for creating a new Script without
+    permitting create_instances to become a blind Script.Source bypass.
+    """
+    if (name or "").lower() != "create_instances":
+        return None
+    rows = _script_creation_rows(args or {})
+    if not rows:
+        return None
+    for cls, source in rows:
+        if normalize_source(source or "") != SCRIPT_BOOTSTRAP_SOURCE:
+            return (
+                f"Blocked: new {cls} instances must be created with Source exactly "
+                f"{SCRIPT_BOOTSTRAP_SOURCE!r}. Then call script_read on the exact new path "
+                "and replace that bootstrap line with the official script edit tool. "
+                "Do not seed arbitrary Script.Source through create_instances."
+            )
+    return None
 
 
 def extract_target(args: dict[str, Any] | None) -> str:
@@ -2593,7 +2663,7 @@ def source_transaction_defects(candidate: str, previous: str, name: str, args: d
     # Atomicity/destructive-diff guard for patch-style edits. Full explicit source
     # replacements are permitted but still pass compiler checks.
     n = (name or '').lower()
-    if previous and n in SCRIPT_MUTATION_NAMES and n not in {"script_write", "write_script", "replace_script"}:
+    if previous and normalize_source(previous) != SCRIPT_BOOTSTRAP_SOURCE and n in SCRIPT_MUTATION_NAMES and n not in {"script_write", "write_script", "replace_script"}:
         ratio = changed_line_ratio(previous, candidate)
         if ratio > V5_MAX_CHANGED_LINE_RATIO:
             defects.append(
@@ -2789,7 +2859,7 @@ def structural_source_defects(candidate: str, previous: str = "", args: dict[str
     if len(candidate.encode('utf-8', errors='replace')) > V5_MAX_SOURCE_BYTES:
         defects.append(f"candidate source exceeds V5 safety limit of {V5_MAX_SOURCE_BYTES} bytes")
     n = (tool_name or '').lower()
-    if previous and n in SCRIPT_MUTATION_NAMES and n not in {"script_write", "write_script", "replace_script"}:
+    if previous and normalize_source(previous) != SCRIPT_BOOTSTRAP_SOURCE and n in SCRIPT_MUTATION_NAMES and n not in {"script_write", "write_script", "replace_script"}:
         ratio = changed_line_ratio(previous, candidate)
         if ratio > V5_MAX_CHANGED_LINE_RATIO:
             defects.append(
@@ -3595,6 +3665,10 @@ def block_reason_for_call(name: str, args: dict[str, Any] | None) -> str | None:
     schema_reason = validate_tool_args(name, args)
     if schema_reason:
         return schema_reason
+
+    creation_reason = script_creation_policy_reason(name, args)
+    if creation_reason:
+        return creation_reason
 
     with _state_lock:
         state = copy.deepcopy(STATE)
@@ -5429,6 +5503,46 @@ def self_test_main() -> int:
         failures.append(f"V6.3.10 pack completion marker missing: {bench_progress!r}")
     if "real-batch" not in (bench_progress.get("batch_complete_markers") or []):
         failures.append(f"V6.3.10 real batch completion marker missing: {bench_progress!r}")
+
+    # V6.3.11 regression: new Script creation has one safe deterministic
+    # bootstrap path. Arbitrary or empty Source creation is blocked.
+    allowed_create = {
+        "instances": [{
+            "className": "Script",
+            "name": "Bench",
+            "parent": "game.ServerStorage.__QWEN_SCRIPT_BENCH__",
+            "properties": {"Source": SCRIPT_BOOTSTRAP_SOURCE},
+        }]
+    }
+    if script_creation_policy_reason("create_instances", allowed_create):
+        failures.append("V6.3.11 safe Script bootstrap creation was blocked")
+    bad_create = {
+        "instances": [{
+            "className": "Script",
+            "name": "Bench",
+            "properties": {"Source": "print('blind source write')"},
+        }]
+    }
+    if not script_creation_policy_reason("create_instances", bad_create):
+        failures.append("V6.3.11 arbitrary create_instances Script.Source was not blocked")
+    empty_create = {"instances": [{"className": "ModuleScript", "name": "Bench"}]}
+    if not script_creation_policy_reason("create_instances", empty_create):
+        failures.append("V6.3.11 empty Script bootstrap creation was not given deterministic guidance")
+    folder_create = {"instances": [{"className": "Folder", "name": "Bench"}]}
+    if script_creation_policy_reason("create_instances", folder_create):
+        failures.append("V6.3.11 non-Script create_instances was incorrectly blocked")
+
+    # Replacing the inert bootstrap line may legitimately change 100% of a
+    # one-line new Script; the normal destructive-diff guard must not reject it.
+    bootstrap_candidate = "local x = 1\nprint(x)"
+    bootstrap_defects = structural_source_defects(
+        bootstrap_candidate,
+        SCRIPT_BOOTSTRAP_SOURCE,
+        {"edits": [{"old_string": SCRIPT_BOOTSTRAP_SOURCE, "new_string": bootstrap_candidate}]},
+        "multi_edit",
+    )
+    if any("atomic edit changes" in x for x in bootstrap_defects):
+        failures.append(f"V6.3.11 bootstrap replacement hit destructive-diff guard: {bootstrap_defects!r}")
 
     # V6.3 regression: controller-bug packets are eligible for automatic
     # GitHub handoff, while non-controller failures are not.
