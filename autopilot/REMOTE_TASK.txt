@@ -251,3 +251,10 @@ end)
 
 print("[SP06] COMPLETE")
 HARNESS_END
+
+
+ARTIFACT RETENTION POLICY
+- Do NOT delete this pack's benchmark Script/ModuleScript harness after it passes.
+- Preserve completed benchmark harnesses in Studio so the user can inspect them later.
+- Temporary objects created by the harness may still be destroyed for test isolation.
+- Do not rerun an earlier completed pack just because its preserved script remains present.
