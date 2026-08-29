@@ -2190,7 +2190,7 @@ def _benchmark_missing_script_create_matches(args: dict[str, Any] | None, target
         if (
             isinstance(cls, str)
             and cls.lower() == "script"
-            and str(name or "") == expected_name
+            and str(name or "").lower() == expected_name.lower()
             and canonical_target(str(parent or "")) == canonical_target(expected_parent)
             and normalize_source(str(source or "")) == SCRIPT_BOOTSTRAP_SOURCE
         ):
