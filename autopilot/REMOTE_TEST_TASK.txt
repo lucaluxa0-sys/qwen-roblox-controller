@@ -1,0 +1,12 @@
+Inspect the currently open Roblox Studio project using the Roblox MCP tools.
+
+This is a read-only automation test.
+
+Requirements:
+- Call supervisor_resume(new_chat=true) first.
+- Do not modify the place, scripts, instances, properties, or settings.
+- Identify the current place/game name if available.
+- List the major top-level services/containers you can verify.
+- Check Roblox Studio Output for relevant current errors.
+- Use controller/tool evidence rather than guessing.
+- When the inspection is complete and the controller gate is clear, emit [TASK_COMPLETE].
