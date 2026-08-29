@@ -1,16 +1,23 @@
-Task-Instance: hold-sp07-for-exec-bootstrap-fallback-6.3.29-20260829T1145Z
-Benchmark-Run-ID: scripting-s001-s024-structured-run6-20260829T0806Z
+Task-Instance: user-paused-autonomous-roblox-20260829T0530PT
 
-PAUSE STUDIO MUTATIONS UNTIL CONTROLLER 6.3.29 IS LIVE.
+USER PAUSED THE ROBLOX AUTONOMOUS PROJECT.
 
-Reason: the live MCP/model path is not reliably using create_instances for missing ModuleScripts. 6.3.29 adds one deterministic execute_luau fallback limited to a proven-missing benchmark ModuleScript/LocalScript, exact declared class/path, and exact inert bootstrap Source.
+Do not continue SP07 or any later benchmark pack.
+Do not call Roblox Studio tools.
+Do not call supervisor_benchmark_record.
+Do not mutate Studio.
+Do not inspect or clean up anything.
+Do not start Play.
+Do not edit controller/project files.
 
-DO NOT call Roblox Studio tools.
-DO NOT call supervisor_benchmark_record.
-ONLY call supervisor_decision_trace once:
-goal="Hold SP07 until exact ModuleScript bootstrap fallback is live"
-evidence=["SP07_Function remains proven missing","6.3.29 is pending activation"]
-decision="Do not mutate Studio"
-next_action="await fresh recovery task after heartbeat proves 6.3.29 live"
-confidence="high"
-Then emit [TASK_COMPLETE] and stop.
+ONLY ACTION:
+1. If supervisor_decision_trace is available, record:
+   goal="Honor user pause"
+   evidence=["user explicitly paused Roblox autonomous work"]
+   decision="Stop all autonomous Roblox actions"
+   next_action="wait for a future explicit resume instruction"
+   confidence="high"
+2. Emit [TASK_COMPLETE]
+3. Stop.
+
+Preserve all current benchmark/controller state for later resume.
