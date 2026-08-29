@@ -1,11 +1,11 @@
 {
   "schema_version": 1,
-  "version": "6.3.25",
+  "version": "6.3.26",
   "channel": "stable",
-  "controller_path": "releases/6.3.25/controller.py",
-  "release_path": "releases/6.3.25/controller.py",
-  "sha256": "4b1b0f1f56d6124493fe744372e0c0f637f85a0c6e605f80267e4729c304510a",
-  "published_at": "2026-08-29T10:55:20Z",
-  "notes": "Safely supports proven-missing benchmark ModuleScript/LocalScript creation through create_instances with the exact inert bootstrap while preserving Script multi_edit recovery and decision-trace gating.",
-  "url": "https://raw.githubusercontent.com/lucaluxa0-sys/qwen-roblox-controller/main/releases/6.3.25/controller.py"
+  "controller_path": "releases/6.3.26/controller.py",
+  "release_path": "releases/6.3.26/controller.py",
+  "sha256": "40bd32cb25b252ee50ae1cdca3ec876e081ae1e57c6add30df49416c66902fcd",
+  "published_at": "2026-08-29T11:05:17Z",
+  "notes": "Protects scripting benchmark run integrity: canonical scripting run IDs, S001-S280 bounds, immutable prior result status, and heartbeat preference for canonical scripting runs over accidental object/path run IDs.",
+  "url": "https://raw.githubusercontent.com/lucaluxa0-sys/qwen-roblox-controller/main/releases/6.3.26/controller.py"
 }
