@@ -1,82 +1,82 @@
-Task-Instance: scripting-s001-s024-bootstrap-run4-20260829T0734Z
-Benchmark-Run-ID: scripting-s001-s024-bootstrap-run4-20260829T0734Z
-These IDs are metadata only. NEVER use either as studio_id.
+Task-Instance: scripting-s001-s024-direct-run5-20260829T0750Z
+Benchmark-Run-ID: scripting-s001-s024-direct-run5-20260829T0750Z
+IDs above are metadata only, never studio_id.
 
-Run Scripting/Luau benchmark S001-S024 as two grouped packs: SP01=S001-S012 and SP02=S013-S024.
+CONTINUE THE S001-S024 GROUPED SCRIPTING BENCHMARK. Do not restart discovery.
 
-FIRST:
-- supervisor_resume(new_chat=true).
-- Work only in the actually connected Studio. If studio_id is stale, call list_roblox_studios and use the real connected ID.
-- Be in Edit mode before script_read/edit work.
-- Do not touch existing user content. Work only under ServerScriptService.__QWEN_SCRIPT_BENCH__.
+KNOWN AUTHORITATIVE STATE:
+- Controller 6.3.12.
+- Studio must be Edit mode for script_read/multi_edit.
+- Existing SP01 path: ServerScriptService.__QWEN_SCRIPT_BENCH__.SP01_ScriptingTests
+- SP01 Source was last proven exactly: -- QWEN_CONTROLLER_SCRIPT_BOOTSTRAP
+- Controller gate was clear.
+- SP02 may not exist yet.
 
-MANDATORY SCRIPT BOOTSTRAP FLOW — CONTROLLER 6.3.12:
-For each pack harness, use one benchmark-created Script under ServerScriptService.__QWEN_SCRIPT_BENCH__.
+HARD ANTI-LOOP RULES:
+- DO NOT call search_game_tree without a path. Never enumerate the whole DataModel.
+- DO NOT call search_game_tree at all for SP01. Its exact path is already known.
+- DO NOT repeatedly call supervisor_resume/get_studio_state/list_roblox_studios. Use the current connected studio from the session. Only call list_roblox_studios ONCE if a tool explicitly says the studio_id is stale.
+- After one successful script_read, do not reread again until after a successful write.
+- After a controller block, follow its stated next action exactly. Do not repeat the blocked action unchanged.
+- Do not inspect user content.
 
-A. Folder:
-1. Ensure ServerScriptService.__QWEN_SCRIPT_BENCH__ exists. Prefer the official create_instances tool for benchmark instance creation.
+SP01 — DO THIS FIRST:
+1. script_read exactly ServerScriptService.__QWEN_SCRIPT_BENCH__.SP01_ScriptingTests.
+2. If Source is exactly -- QWEN_CONTROLLER_SCRIPT_BOOTSTRAP, immediately multi_edit that exact bootstrap line into ONE compact SP01 harness for S001-S012. Do not do any other inspection first.
+3. The SP01 harness must execute runtime assertions and print one exact standalone marker for every capability it can prove:
+   [BENCH:S001:PASS] ... through [BENCH:S012:PASS]
+   Use [BENCH:S###:FAIL:MODEL <reason>] only for a genuinely failed assertion.
+   S002 may be [BENCH:S002:PARTIAL:UNSAFE invalid-source repair not injected because controller safety forbids intentional invalid source] if needed.
+4. Immediately script_read after the successful harness write.
+5. Then start Play, get console Output, and use the runtime markers as evidence.
+6. Stop Play.
+7. Emit any missing standalone BENCH result lines yourself, then [BENCH_PACK_COMPLETE:SP01].
 
-B. New pack Script:
-2. If the pack Script does not exist, CALL THE TOOL NAMED create_instances and create a Script with Source EXACTLY:
+SP01 capability targets:
+S001 arithmetic precedence/comparisons/booleans/strings/parentheses
+S002 syntax-error repair
+S003 assignment vs equality
+S004 and/or/not branches
+S005 string formatting/interpolation
+S006 division/modulo/negatives/floor
+S007 compound assignment
+S008 comments/multiline strings
+S009 reject non-Luau operator
+S010 evaluation order
+S011 Luau type annotations
+S012 predict expression then execute/compare
+
+SP02 — ONLY AFTER SP01 IS DECIDED:
+1. script_read exactly ServerScriptService.__QWEN_SCRIPT_BENCH__.SP02_ScriptingTests once.
+2. If it does not exist, use create_instances to create Script SP02_ScriptingTests under ServerScriptService.__QWEN_SCRIPT_BENCH__ with Source EXACTLY:
 -- QWEN_CONTROLLER_SCRIPT_BOOTSTRAP
-3. Do NOT use execute_luau + Instance.new("Script"), LocalScript, or ModuleScript. Controller 6.3.12 intentionally blocks that path.
-4. Immediately script_read the exact new Script path.
+Never create Script/LocalScript/ModuleScript through execute_luau.
+3. script_read the exact SP02 path once.
+4. multi_edit the bootstrap into ONE compact SP02 harness for S013-S024.
+5. reread, Play, get console Output, stop Play, decide all results, emit [BENCH_PACK_COMPLETE:SP02].
 
-C. Leftover blank pack Script from an older failed run:
-5. If script_read proves the existing benchmark pack Script source is empty, do NOT recreate it blindly and do NOT retry a full harness edit.
-6. Use one transactional multi_edit on that exact cached empty source with old_string="" and new_string="-- QWEN_CONTROLLER_SCRIPT_BOOTSTRAP".
-7. Immediately script_read again. Only continue after the bootstrap line is authoritative.
+SP02 targets:
+S013 local scope/no accidental globals
+S014 block shadowing
+S015 nil-safe missing child
+S016 false vs nil
+S017 typeof and IsA
+S018 optional-value guard
+S019 named constants
+S020 multiple assignment/returns
+S021 lexical closure mutation
+S022 stale Instance reference after destroy/recreate
+S023 string/number conversion validation
+S024 declaration-order/closure repair
 
-D. Harness write:
-8. Only after script_read proves Source is exactly the bootstrap line, use official transactional multi_edit to replace that exact line with the full pack harness.
-9. Immediately script_read again to verify authoritative source.
-10. Start Play only when runtime evidence is needed; collect labeled Output for multiple tests in one pass.
-11. Stop Play before any further source edit.
-12. NEVER use execute_luau to assign Script.Source.
-13. If controller says source is not cached, do NOT retry the mutation. Perform script_read first.
-14. If a test would require intentionally unsafe/invalid source that the guardrail refuses, mark that capability PARTIAL:UNSAFE and continue instead of fighting the controller.
+SAFETY:
+- Never execute_luau to assign Script.Source.
+- Never arbitrary Source in create_instances; only exact inert bootstrap.
+- Only benchmark namespace may be changed.
+- Keep harnesses compact; no narration between required tool calls.
 
-EFFICIENCY:
-- One harness per pack, not one script per test.
-- One Play session / Output retrieval per pack when possible.
-- Harness Output must label assertions by S### so evidence maps to individual capabilities.
-- Do not repeatedly inspect or rewrite after evidence is sufficient.
-
-RESULTS:
-Emit one standalone real result per test:
-[BENCH:S###:PASS]
-or [BENCH:S###:PARTIAL:<reason>]
-or [BENCH:S###:FAIL:<MODEL|CONTROLLER|MCP|ENV|UNSAFE> <reason>]
-Only actual standalone result lines count.
-
-SP01 objectives:
-S001 arithmetic precedence/comparisons/booleans/strings/parentheses.
-S002 repair one syntax error and reread authoritative source.
-S003 assignment vs equality.
-S004 non-trivial and/or/not branches.
-S005 safe string formatting/interpolation.
-S006 division/modulo/negatives/floor behavior.
-S007 compound assignment.
-S008 comments and multiline strings.
-S009 recognize/remove non-Luau operator.
-S010 evaluation order.
-S011 optional Luau type annotations.
-S012 predict expression, execute, compare.
-
-SP02 objectives:
-S013 local scope/no accidental globals.
-S014 block shadowing.
-S015 nil-safe missing child.
-S016 false vs nil.
-S017 typeof and IsA.
-S018 optional-value guard.
-S019 named constants instead of magic values.
-S020 multiple assignment/returns.
-S021 lexical closure mutation.
-S022 stale Instance reference after destroy/recreate.
-S023 string/number conversion validation.
-S024 declaration-order/closure repair.
-
-After S001-S012 are individually decided, emit standalone [BENCH_PACK_COMPLETE:SP01].
-After S013-S024 are individually decided, emit standalone [BENCH_PACK_COMPLETE:SP02].
-Then remove all benchmark-created artifacts, verify cleanup, emit standalone [BENCH_BATCH_COMPLETE:scripting-s001-s024-bootstrap-run4-20260829T0734Z], and only with controller gate clear emit [TASK_COMPLETE].
+FINISH:
+After all S001-S024 have one real standalone result and both pack markers exist, remove benchmark-created artifacts, verify cleanup with a path-scoped check only, emit:
+[BENCH_BATCH_COMPLETE:scripting-s001-s024-direct-run5-20260829T0750Z]
+Then, only if controller gate is clear:
+[TASK_COMPLETE]
