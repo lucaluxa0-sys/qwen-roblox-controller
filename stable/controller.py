@@ -39,8 +39,8 @@ import urllib.request
 from pathlib import Path
 from typing import Any
 
-APP_NAME = "Qwen Roblox Enforced Proxy V6.3.15"
-VERSION = "6.3.15"
+APP_NAME = "Qwen Roblox Enforced Proxy V6.3.16"
+VERSION = "6.3.16"
 
 LOCALAPPDATA = Path(os.environ.get("LOCALAPPDATA", str(Path.home())))
 STATE_DIR = LOCALAPPDATA / "QwenRobloxEnforcedProxy"
@@ -3005,6 +3005,18 @@ def build_expected_source(name: str, args: dict[str, Any] | None) -> tuple[str |
             ), []
         return None, None, []
 
+    if normalize_source(candidate) == normalize_source(current):
+        if normalize_source(current) == SCRIPT_BOOTSTRAP_SOURCE:
+            return candidate, (
+                "Blocked: no-op script transaction. The current source is still the inert benchmark bootstrap. "
+                "Do not replace the bootstrap with itself. Replace the exact bootstrap line with the real script/harness content now, "
+                "then authoritative script_read the same path."
+            ), []
+        return candidate, (
+            "Blocked: no-op script transaction. The proposed resulting source is identical to the authoritative current source. "
+            "Do not spend an MCP write on unchanged code; either make the intended real change or continue verification without mutating."
+        ), []
+
     defects = structural_source_defects(candidate, current, args, name)
     if defects:
         return candidate, (
@@ -5676,6 +5688,27 @@ def self_test_main() -> int:
     )
     if not bootstrap_init:
         failures.append("V6.3.13 blank-to-bootstrap initialization was not recognized")
+
+    # V6.3.16 regression: identical script edits are rejected before reaching
+    # Roblox MCP, with benchmark-specific guidance for bootstrap->bootstrap.
+    noop_target = "ServerScriptService.__QWEN_SCRIPT_BENCH__.SP01_ScriptingTests"
+    SOURCE_CACHE.clear()
+    source_cache_set(noop_target, SCRIPT_BOOTSTRAP_SOURCE)
+    noop_candidate, noop_reason, _ = build_expected_source(
+        "multi_edit",
+        {
+            "file_path": noop_target,
+            "edits": [{
+                "old_string": SCRIPT_BOOTSTRAP_SOURCE,
+                "new_string": SCRIPT_BOOTSTRAP_SOURCE,
+            }],
+        },
+    )
+    if not noop_reason or "no-op" not in noop_reason.lower() or "bootstrap" not in noop_reason.lower():
+        failures.append(
+            f"V6.3.16 bootstrap no-op was not deterministically blocked: "
+            f"candidate={noop_candidate!r} reason={noop_reason!r}"
+        )
 
     # V6.3.14 regression: after a benchmark target is known, pathless whole-tree
     # enumeration is blocked to avoid multi-thousand-token prompt explosions.
