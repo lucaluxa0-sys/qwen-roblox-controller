@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
-  "version": "6.0.0",
+  "version": "6.1.0",
   "channel": "stable",
   "controller_path": "stable/controller.py",
-  "release_path": "releases/6.0.0/controller.py",
-  "sha256": "",
-  "published_at": "2026-08-28T00:00:00Z",
-  "notes": "Initial telemetry foundation release."
+  "release_path": "releases/6.1.0/controller.py",
+  "sha256": "60040e3e5063b1c5c6c79828df3947f227fe36ebddc382d188ef7d842256a0f3",
+  "published_at": "2026-08-29T01:10:00Z",
+  "notes": "Fix stale blocker/playtest deadlock, add Roblox source checks, and preserve non-secret token telemetry metrics."
 }
