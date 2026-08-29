@@ -1,0 +1,2527 @@
+{
+  "schema_version": 1,
+  "suite": "01_scripting",
+  "count": 280,
+  "tests": [
+    {
+      "id": "S001",
+      "group": "scripting_luau",
+      "domain": "syntax_expressions",
+      "objective": "Write valid Luau using arithmetic precedence, comparisons, booleans, strings, and parentheses; verify exact results.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S002",
+      "group": "scripting_luau",
+      "domain": "syntax_expressions",
+      "objective": "Repair one syntax error without changing unrelated behavior, then reread the authoritative source.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S003",
+      "group": "scripting_luau",
+      "domain": "syntax_expressions",
+      "objective": "Demonstrate the difference between assignment and equality comparison.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S004",
+      "group": "scripting_luau",
+      "domain": "syntax_expressions",
+      "objective": "Use and/or/not in a non-trivial expression and verify each branch.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S005",
+      "group": "scripting_luau",
+      "domain": "syntax_expressions",
+      "objective": "Use safe string formatting/interpolation with mixed numeric and string values.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S006",
+      "group": "scripting_luau",
+      "domain": "syntax_expressions",
+      "objective": "Handle division, modulo, negatives, and integer/floor behavior correctly.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S007",
+      "group": "scripting_luau",
+      "domain": "syntax_expressions",
+      "objective": "Use Luau compound assignment and verify the resulting state.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S008",
+      "group": "scripting_luau",
+      "domain": "syntax_expressions",
+      "objective": "Use comments and multiline strings without breaking parsing.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S009",
+      "group": "scripting_luau",
+      "domain": "syntax_expressions",
+      "objective": "Recognize and remove an operator copied from a non-Luau language.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S010",
+      "group": "scripting_luau",
+      "domain": "syntax_expressions",
+      "objective": "Construct an expression where evaluation order matters and prove the intended result.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S011",
+      "group": "scripting_luau",
+      "domain": "syntax_expressions",
+      "objective": "Use optional Luau type annotations without changing runtime behavior.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S012",
+      "group": "scripting_luau",
+      "domain": "syntax_expressions",
+      "objective": "Predict a short expression result first, execute it, and compare prediction to evidence.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S013",
+      "group": "scripting_luau",
+      "domain": "scope_types_nil",
+      "objective": "Demonstrate local scope without creating accidental globals.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S014",
+      "group": "scripting_luau",
+      "domain": "scope_types_nil",
+      "objective": "Demonstrate block shadowing and prove which value is read at each point.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S015",
+      "group": "scripting_luau",
+      "domain": "scope_types_nil",
+      "objective": "Safely handle a missing child returning nil before property access.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S016",
+      "group": "scripting_luau",
+      "domain": "scope_types_nil",
+      "objective": "Distinguish false from nil in branching.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S017",
+      "group": "scripting_luau",
+      "domain": "scope_types_nil",
+      "objective": "Use typeof and IsA appropriately for Roblox values and Instances.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S018",
+      "group": "scripting_luau",
+      "domain": "scope_types_nil",
+      "objective": "Guard an optional value before indexing it.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S019",
+      "group": "scripting_luau",
+      "domain": "scope_types_nil",
+      "objective": "Replace repeated magic values with named locals/constants.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S020",
+      "group": "scripting_luau",
+      "domain": "scope_types_nil",
+      "objective": "Use multiple assignment and multiple returns correctly.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S021",
+      "group": "scripting_luau",
+      "domain": "scope_types_nil",
+      "objective": "Use lexical capture of an outer local and verify mutation behavior.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S022",
+      "group": "scripting_luau",
+      "domain": "scope_types_nil",
+      "objective": "Avoid stale cached Instance references after destroy/recreate.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S023",
+      "group": "scripting_luau",
+      "domain": "scope_types_nil",
+      "objective": "Validate conversion between strings and numbers.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S024",
+      "group": "scripting_luau",
+      "domain": "scope_types_nil",
+      "objective": "Repair a declaration-order bug where a helper captures an unavailable local.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S025",
+      "group": "scripting_luau",
+      "domain": "control_flow",
+      "objective": "Implement if/elseif/else logic with boundary cases.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S026",
+      "group": "scripting_luau",
+      "domain": "control_flow",
+      "objective": "Use a numeric for loop with correct inclusive bounds.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S027",
+      "group": "scripting_luau",
+      "domain": "control_flow",
+      "objective": "Use ipairs for array-like data and verify ordering.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S028",
+      "group": "scripting_luau",
+      "domain": "control_flow",
+      "objective": "Use pairs for dictionary data without assuming order.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S029",
+      "group": "scripting_luau",
+      "domain": "control_flow",
+      "objective": "Use a while loop with a guaranteed termination condition.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S030",
+      "group": "scripting_luau",
+      "domain": "control_flow",
+      "objective": "Use repeat-until correctly and prove it executes at least once.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S031",
+      "group": "scripting_luau",
+      "domain": "control_flow",
+      "objective": "Use continue and break correctly in a filtered loop.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S032",
+      "group": "scripting_luau",
+      "domain": "control_flow",
+      "objective": "Repair an off-by-one loop.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S033",
+      "group": "scripting_luau",
+      "domain": "control_flow",
+      "objective": "Detect and fix an infinite loop while preserving intent.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S034",
+      "group": "scripting_luau",
+      "domain": "control_flow",
+      "objective": "Replace unnecessary polling with an event-driven pattern.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S035",
+      "group": "scripting_luau",
+      "domain": "control_flow",
+      "objective": "Iterate descendants safely while objects may disappear.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S036",
+      "group": "scripting_luau",
+      "domain": "control_flow",
+      "objective": "Implement and verify a small explicit state machine.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S037",
+      "group": "scripting_luau",
+      "domain": "functions_closures",
+      "objective": "Write a pure helper with multiple parameters and return values.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S038",
+      "group": "scripting_luau",
+      "domain": "functions_closures",
+      "objective": "Validate/default optional function arguments.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S039",
+      "group": "scripting_luau",
+      "domain": "functions_closures",
+      "objective": "Demonstrate method colon syntax versus dot syntax correctly.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S040",
+      "group": "scripting_luau",
+      "domain": "functions_closures",
+      "objective": "Repair a colon/dot self-parameter bug.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S041",
+      "group": "scripting_luau",
+      "domain": "functions_closures",
+      "objective": "Use a closure to retain private state.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S042",
+      "group": "scripting_luau",
+      "domain": "functions_closures",
+      "objective": "Demonstrate and fix a loop-variable closure capture bug.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S043",
+      "group": "scripting_luau",
+      "domain": "functions_closures",
+      "objective": "Return a function from a factory and prove independent captured state.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S044",
+      "group": "scripting_luau",
+      "domain": "functions_closures",
+      "objective": "Pass a callback safely and handle callback failure.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S045",
+      "group": "scripting_luau",
+      "domain": "functions_closures",
+      "objective": "Use variadic arguments intentionally and validate them.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S046",
+      "group": "scripting_luau",
+      "domain": "functions_closures",
+      "objective": "Refactor duplicated code into one helper without behavior change.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S047",
+      "group": "scripting_luau",
+      "domain": "functions_closures",
+      "objective": "Write bounded recursion with a correct base case.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S048",
+      "group": "scripting_luau",
+      "domain": "functions_closures",
+      "objective": "Replace unsafe deep recursion with iteration.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S049",
+      "group": "scripting_luau",
+      "domain": "functions_closures",
+      "objective": "Use named local functions in dependency-safe declaration order.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S050",
+      "group": "scripting_luau",
+      "domain": "functions_closures",
+      "objective": "Create a small API table of functions with clear contracts.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S051",
+      "group": "scripting_luau",
+      "domain": "functions_closures",
+      "objective": "Make a function idempotent and prove repeated calls do not duplicate effects.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S052",
+      "group": "scripting_luau",
+      "domain": "functions_closures",
+      "objective": "Diagnose and repair accidentally shared closure state.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S053",
+      "group": "scripting_luau",
+      "domain": "tables_data",
+      "objective": "Create and mutate an array table safely.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S054",
+      "group": "scripting_luau",
+      "domain": "tables_data",
+      "objective": "Create and query a dictionary table safely.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S055",
+      "group": "scripting_luau",
+      "domain": "tables_data",
+      "objective": "Distinguish shallow copy from deep copy.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S056",
+      "group": "scripting_luau",
+      "domain": "tables_data",
+      "objective": "Implement a bounded deep-copy helper for nested benchmark data.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S057",
+      "group": "scripting_luau",
+      "domain": "tables_data",
+      "objective": "Merge config tables without mutating defaults.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S058",
+      "group": "scripting_luau",
+      "domain": "tables_data",
+      "objective": "Remove entries while iterating without skipping data.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S059",
+      "group": "scripting_luau",
+      "domain": "tables_data",
+      "objective": "Use table.insert and table.remove correctly.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S060",
+      "group": "scripting_luau",
+      "domain": "tables_data",
+      "objective": "Use table.find or an equivalent lookup appropriately.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S061",
+      "group": "scripting_luau",
+      "domain": "tables_data",
+      "objective": "Use table.sort with a deterministic comparator.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S062",
+      "group": "scripting_luau",
+      "domain": "tables_data",
+      "objective": "Represent inventory-like data with stable IDs rather than display names.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S063",
+      "group": "scripting_luau",
+      "domain": "tables_data",
+      "objective": "Serialize only JSON-safe table content.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S064",
+      "group": "scripting_luau",
+      "domain": "tables_data",
+      "objective": "Detect and reject cyclic data before serialization.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S065",
+      "group": "scripting_luau",
+      "domain": "tables_data",
+      "objective": "Demonstrate a justified weak-table lifecycle use.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S066",
+      "group": "scripting_luau",
+      "domain": "tables_data",
+      "objective": "Normalize input into a canonical table schema.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S067",
+      "group": "scripting_luau",
+      "domain": "tables_data",
+      "objective": "Compare tables by meaningful fields rather than reference identity when needed.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S068",
+      "group": "scripting_luau",
+      "domain": "tables_data",
+      "objective": "Repair a shared-default-table bug where instances mutate each other.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S069",
+      "group": "scripting_luau",
+      "domain": "metatables_oop",
+      "objective": "Implement a minimal class-like constructor with __index.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S070",
+      "group": "scripting_luau",
+      "domain": "metatables_oop",
+      "objective": "Create two instances and prove mutable state is independent.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S071",
+      "group": "scripting_luau",
+      "domain": "metatables_oop",
+      "objective": "Implement inheritance-like lookup without sharing instance fields.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S072",
+      "group": "scripting_luau",
+      "domain": "metatables_oop",
+      "objective": "Repair an __index misconfiguration.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S073",
+      "group": "scripting_luau",
+      "domain": "metatables_oop",
+      "objective": "Implement a small read-only proxy.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S074",
+      "group": "scripting_luau",
+      "domain": "metatables_oop",
+      "objective": "Use one metamethod such as __tostring correctly.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S075",
+      "group": "scripting_luau",
+      "domain": "metatables_oop",
+      "objective": "Repair a metatable applied to the wrong table.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S076",
+      "group": "scripting_luau",
+      "domain": "metatables_oop",
+      "objective": "Preserve intended metatable identity during copying.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S077",
+      "group": "scripting_luau",
+      "domain": "metatables_oop",
+      "objective": "Build a component object with Start and Destroy lifecycle.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S078",
+      "group": "scripting_luau",
+      "domain": "metatables_oop",
+      "objective": "Make Destroy idempotent and disconnect owned connections.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S079",
+      "group": "scripting_luau",
+      "domain": "metatables_oop",
+      "objective": "Compare metatable OOP with a plain-table solution and choose the simpler valid design.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S080",
+      "group": "scripting_luau",
+      "domain": "metatables_oop",
+      "objective": "Debug a colon-method call where self points at the wrong object.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S081",
+      "group": "scripting_luau",
+      "domain": "modules",
+      "objective": "Create a ModuleScript returning a table API and require it from a benchmark Script.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S082",
+      "group": "scripting_luau",
+      "domain": "modules",
+      "objective": "Create a ModuleScript returning a function and call it correctly.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S083",
+      "group": "scripting_luau",
+      "domain": "modules",
+      "objective": "Split a monolithic benchmark script into two modules with one-way dependencies.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S084",
+      "group": "scripting_luau",
+      "domain": "modules",
+      "objective": "Detect and avoid a circular require.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S085",
+      "group": "scripting_luau",
+      "domain": "modules",
+      "objective": "Share immutable configuration through a module without accidental mutation.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S086",
+      "group": "scripting_luau",
+      "domain": "modules",
+      "objective": "Prove require caching behavior in one VM context.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S087",
+      "group": "scripting_luau",
+      "domain": "modules",
+      "objective": "Design a module so requiring it has minimal side effects.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S088",
+      "group": "scripting_luau",
+      "domain": "modules",
+      "objective": "Use explicit Init/Start lifecycle instead of heavy work during require.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S089",
+      "group": "scripting_luau",
+      "domain": "modules",
+      "objective": "Pass dependencies into a module rather than hard-coding lookups.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S090",
+      "group": "scripting_luau",
+      "domain": "modules",
+      "objective": "Repair a module that accidentally returns nil.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S091",
+      "group": "scripting_luau",
+      "domain": "modules",
+      "objective": "Repair a module method that depends on a private helper declared incorrectly.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S092",
+      "group": "scripting_luau",
+      "domain": "modules",
+      "objective": "Use a ModuleScript from server code while respecting client/server boundaries.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S093",
+      "group": "scripting_luau",
+      "domain": "modules",
+      "objective": "Create and verify a three-module dependency graph.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S094",
+      "group": "scripting_luau",
+      "domain": "modules",
+      "objective": "Refactor duplicate helpers from two benchmark scripts into one shared module.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S095",
+      "group": "scripting_luau",
+      "domain": "events_connections",
+      "objective": "Connect to a Roblox event and handle arguments correctly.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S096",
+      "group": "scripting_luau",
+      "domain": "events_connections",
+      "objective": "Disconnect a connection when its owner is destroyed.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S097",
+      "group": "scripting_luau",
+      "domain": "events_connections",
+      "objective": "Avoid repeatedly connecting the same handler.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S098",
+      "group": "scripting_luau",
+      "domain": "events_connections",
+      "objective": "Use a one-shot connection pattern when only one event is needed.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S099",
+      "group": "scripting_luau",
+      "domain": "events_connections",
+      "objective": "Implement a debounce that cannot remain locked after an error.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S100",
+      "group": "scripting_luau",
+      "domain": "events_connections",
+      "objective": "Implement per-object debounce instead of one global boolean.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S101",
+      "group": "scripting_luau",
+      "domain": "events_connections",
+      "objective": "Use BindableEvent for local decoupling in the benchmark namespace.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S102",
+      "group": "scripting_luau",
+      "domain": "events_connections",
+      "objective": "Repair an event connection leak across repeated Start calls.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S103",
+      "group": "scripting_luau",
+      "domain": "events_connections",
+      "objective": "Handle ChildAdded while also processing pre-existing children.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S104",
+      "group": "scripting_luau",
+      "domain": "events_connections",
+      "objective": "Use GetPropertyChangedSignal instead of broad polling.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S105",
+      "group": "scripting_luau",
+      "domain": "events_connections",
+      "objective": "Protect callbacks from stale/destroyed references.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S106",
+      "group": "scripting_luau",
+      "domain": "events_connections",
+      "objective": "Prevent an event callback from recursively triggering without bound.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S107",
+      "group": "scripting_luau",
+      "domain": "events_connections",
+      "objective": "Build an owner object that cleans up all connections on Destroy.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S108",
+      "group": "scripting_luau",
+      "domain": "events_connections",
+      "objective": "Diagnose a double-fired event and prove the duplicate connection source.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S109",
+      "group": "scripting_luau",
+      "domain": "roblox_services_api",
+      "objective": "Acquire and use Roblox services with game:GetService.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S110",
+      "group": "scripting_luau",
+      "domain": "roblox_services_api",
+      "objective": "Use Players, PlayerAdded, and CharacterAdded correctly in isolation.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S111",
+      "group": "scripting_luau",
+      "domain": "roblox_services_api",
+      "objective": "Use RunService on the correct execution side and avoid unnecessary frame work.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S112",
+      "group": "scripting_luau",
+      "domain": "roblox_services_api",
+      "objective": "Use Debris for timed cleanup where appropriate.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S113",
+      "group": "scripting_luau",
+      "domain": "roblox_services_api",
+      "objective": "Use CollectionService tags and verify membership.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S114",
+      "group": "scripting_luau",
+      "domain": "roblox_services_api",
+      "objective": "Use HttpService JSONEncode/JSONDecode on safe benchmark data.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S115",
+      "group": "scripting_luau",
+      "domain": "roblox_services_api",
+      "objective": "Use TweenService on a benchmark property and verify completion.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S116",
+      "group": "scripting_luau",
+      "domain": "roblox_services_api",
+      "objective": "Use PhysicsService only in a benchmark-scoped way when supported.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S117",
+      "group": "scripting_luau",
+      "domain": "roblox_services_api",
+      "objective": "Keep marketplace-like checks read-only unless mutation is explicitly required.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S118",
+      "group": "scripting_luau",
+      "domain": "roblox_services_api",
+      "objective": "Use ReplicatedStorage appropriately for shared benchmark objects.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S119",
+      "group": "scripting_luau",
+      "domain": "roblox_services_api",
+      "objective": "Use ServerStorage for server-only benchmark artifacts.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S120",
+      "group": "scripting_luau",
+      "domain": "roblox_services_api",
+      "objective": "Use attributes for lightweight metadata and verify types.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S121",
+      "group": "scripting_luau",
+      "domain": "roblox_services_api",
+      "objective": "Choose FindFirstChild, WaitForChild, or direct indexing based on timing certainty.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S122",
+      "group": "scripting_luau",
+      "domain": "roblox_services_api",
+      "objective": "Replace an intentionally wrong service/API choice with the correct one using evidence.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S123",
+      "group": "scripting_luau",
+      "domain": "instances_from_code",
+      "objective": "Create a benchmark Folder and Part with Instance.new, configuring before parenting.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S124",
+      "group": "scripting_luau",
+      "domain": "instances_from_code",
+      "objective": "Clone a benchmark object and prove clone independence.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S125",
+      "group": "scripting_luau",
+      "domain": "instances_from_code",
+      "objective": "Destroy a benchmark object and verify stale references are handled safely.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S126",
+      "group": "scripting_luau",
+      "domain": "instances_from_code",
+      "objective": "Move an instance between benchmark containers.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S127",
+      "group": "scripting_luau",
+      "domain": "instances_from_code",
+      "objective": "Set common Part properties with valid Roblox value types.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S128",
+      "group": "scripting_luau",
+      "domain": "instances_from_code",
+      "objective": "Use Vector3 and CFrame without confusing them with Instances.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S129",
+      "group": "scripting_luau",
+      "domain": "instances_from_code",
+      "objective": "Use PivotTo/GetPivot on a benchmark Model.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S130",
+      "group": "scripting_luau",
+      "domain": "instances_from_code",
+      "objective": "Find descendants by class/hierarchy instead of fragile name keywords.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S131",
+      "group": "scripting_luau",
+      "domain": "instances_from_code",
+      "objective": "Use attributes/tags to identify benchmark objects robustly.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S132",
+      "group": "scripting_luau",
+      "domain": "instances_from_code",
+      "objective": "Guard FindFirstChild before accessing a child Value.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S133",
+      "group": "scripting_luau",
+      "domain": "instances_from_code",
+      "objective": "Create and validate an ObjectValue reference.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S134",
+      "group": "scripting_luau",
+      "domain": "instances_from_code",
+      "objective": "Create NumberValue/StringValue/BoolValue and use .Value correctly.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S135",
+      "group": "scripting_luau",
+      "domain": "instances_from_code",
+      "objective": "Distinguish an instance name from a Roblox class in IsA.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S136",
+      "group": "scripting_luau",
+      "domain": "instances_from_code",
+      "objective": "Avoid Accessory.RootPart and use a valid benchmark Accessory/Handle structure.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S137",
+      "group": "scripting_luau",
+      "domain": "instances_from_code",
+      "objective": "Perform a batch hierarchy mutation then reread authoritative state.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S138",
+      "group": "scripting_luau",
+      "domain": "instances_from_code",
+      "objective": "Clean up all benchmark-created instances without touching unrelated content.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S139",
+      "group": "scripting_luau",
+      "domain": "async_timing",
+      "objective": "Use task.wait instead of legacy wait in new code.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S140",
+      "group": "scripting_luau",
+      "domain": "async_timing",
+      "objective": "Use task.delay with object-lifetime guards.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S141",
+      "group": "scripting_luau",
+      "domain": "async_timing",
+      "objective": "Use task.spawn intentionally while surfacing errors.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S142",
+      "group": "scripting_luau",
+      "domain": "async_timing",
+      "objective": "Invalidate scheduled work when its owner is destroyed.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S143",
+      "group": "scripting_luau",
+      "domain": "async_timing",
+      "objective": "Implement a timeout without a busy loop.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S144",
+      "group": "scripting_luau",
+      "domain": "async_timing",
+      "objective": "Coordinate two async operations without arbitrary sleeps.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S145",
+      "group": "scripting_luau",
+      "domain": "async_timing",
+      "objective": "Use coroutine.create/resume and handle resume errors.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S146",
+      "group": "scripting_luau",
+      "domain": "async_timing",
+      "objective": "Choose task.spawn versus raw coroutine use appropriately.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S147",
+      "group": "scripting_luau",
+      "domain": "async_timing",
+      "objective": "Avoid races when two callbacks mutate the same benchmark state.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S148",
+      "group": "scripting_luau",
+      "domain": "async_timing",
+      "objective": "Use a generation/token pattern to invalidate stale async work.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S149",
+      "group": "scripting_luau",
+      "domain": "async_timing",
+      "objective": "Measure elapsed time with an appropriate clock without assuming exact scheduling.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S150",
+      "group": "scripting_luau",
+      "domain": "async_timing",
+      "objective": "Repair an async callback acting on an object from an old generation.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S151",
+      "group": "scripting_luau",
+      "domain": "errors_defensive",
+      "objective": "Use pcall around an operation that can legitimately fail and preserve the error.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S152",
+      "group": "scripting_luau",
+      "domain": "errors_defensive",
+      "objective": "Use xpcall with traceback handling in a contained example.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S153",
+      "group": "scripting_luau",
+      "domain": "errors_defensive",
+      "objective": "Avoid blanket pcall that hides ordinary bugs.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S154",
+      "group": "scripting_luau",
+      "domain": "errors_defensive",
+      "objective": "Validate function arguments and fail with useful context.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S155",
+      "group": "scripting_luau",
+      "domain": "errors_defensive",
+      "objective": "Use assert only for programmer invariants.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S156",
+      "group": "scripting_luau",
+      "domain": "errors_defensive",
+      "objective": "Recover from a missing optional benchmark object.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S157",
+      "group": "scripting_luau",
+      "domain": "errors_defensive",
+      "objective": "Fail fast when a required benchmark dependency is missing.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S158",
+      "group": "scripting_luau",
+      "domain": "errors_defensive",
+      "objective": "Use bounded retries for a mocked transient failure.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S159",
+      "group": "scripting_luau",
+      "domain": "errors_defensive",
+      "objective": "Never retry deterministic errors forever.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S160",
+      "group": "scripting_luau",
+      "domain": "errors_defensive",
+      "objective": "Include the benchmark ID in warnings/errors.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S161",
+      "group": "scripting_luau",
+      "domain": "errors_defensive",
+      "objective": "Differentiate runtime/API failure from MCP/controller transport failure.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S162",
+      "group": "scripting_luau",
+      "domain": "errors_defensive",
+      "objective": "Repair code that catches an error and then continues with invalid state.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S163",
+      "group": "scripting_luau",
+      "domain": "client_server_remotes",
+      "objective": "Create a benchmark RemoteEvent and wire server/client sides correctly.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S164",
+      "group": "scripting_luau",
+      "domain": "client_server_remotes",
+      "objective": "Send a primitive client-to-server payload and validate it.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S165",
+      "group": "scripting_luau",
+      "domain": "client_server_remotes",
+      "objective": "Reject malformed remote payloads on the server.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S166",
+      "group": "scripting_luau",
+      "domain": "client_server_remotes",
+      "objective": "Do not trust client-provided authority values such as price or damage.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S167",
+      "group": "scripting_luau",
+      "domain": "client_server_remotes",
+      "objective": "Send a server-to-client notification payload.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S168",
+      "group": "scripting_luau",
+      "domain": "client_server_remotes",
+      "objective": "Create a benchmark RemoteFunction with a bounded response.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S169",
+      "group": "scripting_luau",
+      "domain": "client_server_remotes",
+      "objective": "Avoid indefinite server waits on a client response.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S170",
+      "group": "scripting_luau",
+      "domain": "client_server_remotes",
+      "objective": "Rate-limit a benchmark remote per player.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S171",
+      "group": "scripting_luau",
+      "domain": "client_server_remotes",
+      "objective": "Validate client-provided Instance references against an allowed hierarchy.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S172",
+      "group": "scripting_luau",
+      "domain": "client_server_remotes",
+      "objective": "Keep server-owned state authoritative.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S173",
+      "group": "scripting_luau",
+      "domain": "client_server_remotes",
+      "objective": "Keep server-only data out of ReplicatedStorage/LocalScripts.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S174",
+      "group": "scripting_luau",
+      "domain": "client_server_remotes",
+      "objective": "Repair remote arguments in the wrong order.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S175",
+      "group": "scripting_luau",
+      "domain": "client_server_remotes",
+      "objective": "Repair server code that tries to use LocalPlayer.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S176",
+      "group": "scripting_luau",
+      "domain": "client_server_remotes",
+      "objective": "Repair client code that tries to use server-only storage.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S177",
+      "group": "scripting_luau",
+      "domain": "client_server_remotes",
+      "objective": "Design a request/response protocol with explicit action names and schemas.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S178",
+      "group": "scripting_luau",
+      "domain": "client_server_remotes",
+      "objective": "Implement a secure mini transaction where the server independently verifies the request.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S179",
+      "group": "scripting_luau",
+      "domain": "persistence_serialization",
+      "objective": "Encode/decode a benchmark save table with HttpService JSON.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S180",
+      "group": "scripting_luau",
+      "domain": "persistence_serialization",
+      "objective": "Fill missing save fields from defaults.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S181",
+      "group": "scripting_luau",
+      "domain": "persistence_serialization",
+      "objective": "Version a benchmark save schema and migrate an older version.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S182",
+      "group": "scripting_luau",
+      "domain": "persistence_serialization",
+      "objective": "Reject unserializable Instances/functions before persistence.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S183",
+      "group": "scripting_luau",
+      "domain": "persistence_serialization",
+      "objective": "Keep transient runtime objects out of save data.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S184",
+      "group": "scripting_luau",
+      "domain": "persistence_serialization",
+      "objective": "Implement pure in-memory load/update/save adapter logic.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S185",
+      "group": "scripting_luau",
+      "domain": "persistence_serialization",
+      "objective": "Use update-transform style logic for concurrency-safe persistence design.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S186",
+      "group": "scripting_luau",
+      "domain": "persistence_serialization",
+      "objective": "Use bounded retry/backoff around a mocked transient storage failure.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S187",
+      "group": "scripting_luau",
+      "domain": "persistence_serialization",
+      "objective": "Validate numeric ranges and enum-like strings on load.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S188",
+      "group": "scripting_luau",
+      "domain": "persistence_serialization",
+      "objective": "Preserve stable IDs across encode/decode.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S189",
+      "group": "scripting_luau",
+      "domain": "persistence_serialization",
+      "objective": "Detect corrupted benchmark data and fall back safely.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S190",
+      "group": "scripting_luau",
+      "domain": "persistence_serialization",
+      "objective": "Separate persistence adapter code from gameplay-domain logic.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S191",
+      "group": "scripting_luau",
+      "domain": "debugging",
+      "objective": "Find and fix one syntax error using source/Output evidence.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S192",
+      "group": "scripting_luau",
+      "domain": "debugging",
+      "objective": "Find and fix a nil-index bug.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S193",
+      "group": "scripting_luau",
+      "domain": "debugging",
+      "objective": "Find and fix an invalid-member bug.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S194",
+      "group": "scripting_luau",
+      "domain": "debugging",
+      "objective": "Find and fix an incorrect Roblox class check.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S195",
+      "group": "scripting_luau",
+      "domain": "debugging",
+      "objective": "Find and fix a Vector3-versus-Instance type misuse.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S196",
+      "group": "scripting_luau",
+      "domain": "debugging",
+      "objective": "Find and fix a colon/dot method bug.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S197",
+      "group": "scripting_luau",
+      "domain": "debugging",
+      "objective": "Find and fix a declaration-order/closure bug.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S198",
+      "group": "scripting_luau",
+      "domain": "debugging",
+      "objective": "Find and fix an event connection leak.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S199",
+      "group": "scripting_luau",
+      "domain": "debugging",
+      "objective": "Find and fix a stale reference after destroy/recreate.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S200",
+      "group": "scripting_luau",
+      "domain": "debugging",
+      "objective": "Find and fix a client/server boundary violation.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S201",
+      "group": "scripting_luau",
+      "domain": "debugging",
+      "objective": "Find and fix an infinite/repeated loop.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S202",
+      "group": "scripting_luau",
+      "domain": "debugging",
+      "objective": "Find and fix a shallow-copy shared-state bug.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S203",
+      "group": "scripting_luau",
+      "domain": "debugging",
+      "objective": "Repair a script with at least three independent defects without introducing a new one.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S204",
+      "group": "scripting_luau",
+      "domain": "debugging",
+      "objective": "Trace misleading symptoms across multiple benchmark scripts to identify the root cause.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S205",
+      "group": "scripting_luau",
+      "domain": "refactoring",
+      "objective": "Rename unclear locals/functions without changing behavior.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S206",
+      "group": "scripting_luau",
+      "domain": "refactoring",
+      "objective": "Extract duplicated logic into one helper and verify identical outputs.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S207",
+      "group": "scripting_luau",
+      "domain": "refactoring",
+      "objective": "Split a long function into cohesive helpers.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S208",
+      "group": "scripting_luau",
+      "domain": "refactoring",
+      "objective": "Replace magic strings/numbers with named constants.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S209",
+      "group": "scripting_luau",
+      "domain": "refactoring",
+      "objective": "Reduce nesting with guard clauses.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S210",
+      "group": "scripting_luau",
+      "domain": "refactoring",
+      "objective": "Replace repeated hierarchy scans with a safe cached/event-driven pattern where appropriate.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S211",
+      "group": "scripting_luau",
+      "domain": "refactoring",
+      "objective": "Add cleanup/lifecycle ownership to leaking benchmark code.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S212",
+      "group": "scripting_luau",
+      "domain": "refactoring",
+      "objective": "Separate data/config from behavior.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S213",
+      "group": "scripting_luau",
+      "domain": "refactoring",
+      "objective": "Refactor a module API without breaking benchmark callers.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S214",
+      "group": "scripting_luau",
+      "domain": "refactoring",
+      "objective": "Reduce side effects during require.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S215",
+      "group": "scripting_luau",
+      "domain": "refactoring",
+      "objective": "Improve error messages without changing control flow.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S216",
+      "group": "scripting_luau",
+      "domain": "refactoring",
+      "objective": "Add useful type annotations at boundaries without rewriting everything.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S217",
+      "group": "scripting_luau",
+      "domain": "refactoring",
+      "objective": "Compare before/after behavior with deterministic evidence.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S218",
+      "group": "scripting_luau",
+      "domain": "refactoring",
+      "objective": "Reject an unnecessarily large refactor when a smaller safe change solves the problem.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S219",
+      "group": "scripting_luau",
+      "domain": "performance",
+      "objective": "Detect and remove a needless per-frame loop.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S220",
+      "group": "scripting_luau",
+      "domain": "performance",
+      "objective": "Throttle recurring work to an appropriate frequency.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S221",
+      "group": "scripting_luau",
+      "domain": "performance",
+      "objective": "Replace repeated GetDescendants scans with event/tag-driven tracking when appropriate.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S222",
+      "group": "scripting_luau",
+      "domain": "performance",
+      "objective": "Disconnect Heartbeat/RenderStepped connections on cleanup.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S223",
+      "group": "scripting_luau",
+      "domain": "performance",
+      "objective": "Prevent task.spawn accumulation during an event storm.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S224",
+      "group": "scripting_luau",
+      "domain": "performance",
+      "objective": "Prevent unbounded benchmark cache growth.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S225",
+      "group": "scripting_luau",
+      "domain": "performance",
+      "objective": "Implement a bounded cache eviction policy.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S226",
+      "group": "scripting_luau",
+      "domain": "performance",
+      "objective": "Batch repeated property/instance work when it preserves behavior.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S227",
+      "group": "scripting_luau",
+      "domain": "performance",
+      "objective": "Avoid repeated require/lookups in a hot path when safe caching is possible.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S228",
+      "group": "scripting_luau",
+      "domain": "performance",
+      "objective": "Detect a memory leak caused by retained closures/references.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S229",
+      "group": "scripting_luau",
+      "domain": "performance",
+      "objective": "Detect excessive event connections and reduce them.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S230",
+      "group": "scripting_luau",
+      "domain": "performance",
+      "objective": "Measure a before/after operation count or timing proxy to prove improvement.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S231",
+      "group": "scripting_luau",
+      "domain": "performance",
+      "objective": "Keep optimizations evidence-driven rather than speculative.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S232",
+      "group": "scripting_luau",
+      "domain": "performance",
+      "objective": "Repair runaway work while preserving the functional requirement.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S233",
+      "group": "scripting_luau",
+      "domain": "multi_script_architecture",
+      "objective": "Design a three-script benchmark system with clear responsibilities.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S234",
+      "group": "scripting_luau",
+      "domain": "multi_script_architecture",
+      "objective": "Trace data flow across Script, ModuleScript, and BindableEvent.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S235",
+      "group": "scripting_luau",
+      "domain": "multi_script_architecture",
+      "objective": "Trace control flow across server Script and shared module.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S236",
+      "group": "scripting_luau",
+      "domain": "multi_script_architecture",
+      "objective": "Refactor cross-script duplicated state into one authoritative owner.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S237",
+      "group": "scripting_luau",
+      "domain": "multi_script_architecture",
+      "objective": "Prevent circular module dependencies in a multi-script feature.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S238",
+      "group": "scripting_luau",
+      "domain": "multi_script_architecture",
+      "objective": "Create explicit initialization ordering for dependent modules.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S239",
+      "group": "scripting_luau",
+      "domain": "multi_script_architecture",
+      "objective": "Implement cleanup across multiple cooperating components.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S240",
+      "group": "scripting_luau",
+      "domain": "multi_script_architecture",
+      "objective": "Propagate an error with enough context to identify the originating module.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S241",
+      "group": "scripting_luau",
+      "domain": "multi_script_architecture",
+      "objective": "Change one module contract and safely update every benchmark caller.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S242",
+      "group": "scripting_luau",
+      "domain": "multi_script_architecture",
+      "objective": "Find a bug whose symptom appears in one script but root cause is in another.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S243",
+      "group": "scripting_luau",
+      "domain": "multi_script_architecture",
+      "objective": "Introduce a feature spanning at least three benchmark scripts and verify end-to-end behavior.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S244",
+      "group": "scripting_luau",
+      "domain": "multi_script_architecture",
+      "objective": "Recover gracefully when one optional module/component is absent.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S245",
+      "group": "scripting_luau",
+      "domain": "multi_script_architecture",
+      "objective": "Use dependency injection/test doubles for one external dependency.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S246",
+      "group": "scripting_luau",
+      "domain": "multi_script_architecture",
+      "objective": "Produce a concise architecture summary from authoritative source before editing.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S247",
+      "group": "scripting_luau",
+      "domain": "security_trust",
+      "objective": "Validate all client-provided values used by a benchmark remote.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S248",
+      "group": "scripting_luau",
+      "domain": "security_trust",
+      "objective": "Reject an Instance reference outside the allowed benchmark hierarchy.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S249",
+      "group": "scripting_luau",
+      "domain": "security_trust",
+      "objective": "Keep a server-only secret/config out of replicated containers.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S250",
+      "group": "scripting_luau",
+      "domain": "security_trust",
+      "objective": "Prevent a client from selecting arbitrary target players/objects without server checks.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S251",
+      "group": "scripting_luau",
+      "domain": "security_trust",
+      "objective": "Rate-limit a spam-prone benchmark remote.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S252",
+      "group": "scripting_luau",
+      "domain": "security_trust",
+      "objective": "Validate string length, number range, and enum-like values.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S253",
+      "group": "scripting_luau",
+      "domain": "security_trust",
+      "objective": "Use server-side price/state rather than trusting client values.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S254",
+      "group": "scripting_luau",
+      "domain": "security_trust",
+      "objective": "Avoid execute-like behavior from untrusted strings.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S255",
+      "group": "scripting_luau",
+      "domain": "security_trust",
+      "objective": "Do not expose privileged benchmark ModuleScripts to the client unnecessarily.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S256",
+      "group": "scripting_luau",
+      "domain": "security_trust",
+      "objective": "Design permissions around stable IDs/ownership rather than display names.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S257",
+      "group": "scripting_luau",
+      "domain": "security_trust",
+      "objective": "Log rejected actions with safe context but no secrets.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S258",
+      "group": "scripting_luau",
+      "domain": "security_trust",
+      "objective": "Review a mini remote protocol and identify every trust-boundary flaw.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S259",
+      "group": "scripting_luau",
+      "domain": "advanced_mixed",
+      "objective": "Build a deterministic finite-state benchmark subsystem using modules and events.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S260",
+      "group": "scripting_luau",
+      "domain": "advanced_mixed",
+      "objective": "Build an object lifecycle with async work, connections, and full cleanup.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S261",
+      "group": "scripting_luau",
+      "domain": "advanced_mixed",
+      "objective": "Build a small command router with schemas and server-side validation.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S262",
+      "group": "scripting_luau",
+      "domain": "advanced_mixed",
+      "objective": "Build a data normalization pipeline with error reporting.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S263",
+      "group": "scripting_luau",
+      "domain": "advanced_mixed",
+      "objective": "Build a component registry using CollectionService and module constructors.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S264",
+      "group": "scripting_luau",
+      "domain": "advanced_mixed",
+      "objective": "Build a bounded scheduler for benchmark jobs.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S265",
+      "group": "scripting_luau",
+      "domain": "advanced_mixed",
+      "objective": "Build a small immutable-config plus mutable-runtime-state architecture.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S266",
+      "group": "scripting_luau",
+      "domain": "advanced_mixed",
+      "objective": "Build a mock save-service adapter with schema migration.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S267",
+      "group": "scripting_luau",
+      "domain": "advanced_mixed",
+      "objective": "Repair a mixed bug involving async timing, shared tables, and stale Instances.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S268",
+      "group": "scripting_luau",
+      "domain": "advanced_mixed",
+      "objective": "Repair a mixed bug involving modules, remotes, and trust validation.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S269",
+      "group": "scripting_luau",
+      "domain": "advanced_mixed",
+      "objective": "Refactor a multi-script subsystem while preserving its external contract.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S270",
+      "group": "scripting_luau",
+      "domain": "advanced_mixed",
+      "objective": "Explain and verify the final dependency/lifecycle model after a mixed implementation.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S271",
+      "group": "scripting_luau",
+      "domain": "integrated_missions",
+      "objective": "Create a benchmark-only mini round system with modules, events, state transitions, cleanup, and deterministic verification.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S272",
+      "group": "scripting_luau",
+      "domain": "integrated_missions",
+      "objective": "Create a benchmark-only secure interaction system with client request, server validation, and response.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S273",
+      "group": "scripting_luau",
+      "domain": "integrated_missions",
+      "objective": "Create a benchmark-only inventory data model with serialization, validation, modules, and tests.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S274",
+      "group": "scripting_luau",
+      "domain": "integrated_missions",
+      "objective": "Create a benchmark-only component framework for tagged Parts with Start/Destroy lifecycle.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S275",
+      "group": "scripting_luau",
+      "domain": "integrated_missions",
+      "objective": "Create a benchmark-only checkpoint-like logic system using modules and events without touching real player data.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S276",
+      "group": "scripting_luau",
+      "domain": "integrated_missions",
+      "objective": "Debug a generated benchmark subsystem containing syntax, runtime, architecture, and cleanup defects.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S277",
+      "group": "scripting_luau",
+      "domain": "integrated_missions",
+      "objective": "Refactor a generated monolithic benchmark feature into modules while preserving behavior.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S278",
+      "group": "scripting_luau",
+      "domain": "integrated_missions",
+      "objective": "Diagnose and fix a benchmark performance leak involving events, async tasks, and retained state.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S279",
+      "group": "scripting_luau",
+      "domain": "integrated_missions",
+      "objective": "Inspect an unfamiliar benchmark-created multi-script project, summarize architecture, make one requested feature change, and verify it.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    },
+    {
+      "id": "S280",
+      "group": "scripting_luau",
+      "domain": "integrated_missions",
+      "objective": "Complete a final autonomous mission combining Luau, APIs, modules, remotes, debugging, runtime verification, cleanup, and a concise evidence report.",
+      "isolation": "ServerStorage.__QWEN_SCRIPT_BENCH__ only unless the test explicitly requires a benchmark-created ReplicatedStorage/StarterPlayer object.",
+      "evidence": "Authoritative source reread plus runtime/Output evidence when behavior is runtime-dependent.",
+      "cleanup": true
+    }
+  ]
+}
