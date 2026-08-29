@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
-  "version": "6.3.18",
+  "version": "6.3.19",
   "channel": "stable",
-  "controller_path": "releases/6.3.18/controller.py",
-  "release_path": "releases/6.3.18/controller.py",
-  "sha256": "3728ffc0af855df256373eaa731113a339588afcdb6793f0cfcdec8cd1b39f18",
-  "published_at": "2026-08-29T08:14:31Z",
-  "notes": "Adds deterministic recovery for benchmark Scripts proven missing while Studio is already in Edit mode. The controller gates the next action to the exact create_instances inert-bootstrap creation for the missing benchmark Script, blocks multi_edit against the nonexistent path with explicit creation guidance, then requires script_read before editing. Preserves 6.3.17 structured run-scoped benchmark reporting."
+  "controller_path": "releases/6.3.19/controller.py",
+  "release_path": "releases/6.3.19/controller.py",
+  "sha256": "fe0a4017c37b9d7f6d43c0d0a66d1aa5ac24171c3b6c5956722989d973394a7a",
+  "published_at": "2026-08-29T08:15:39Z",
+  "notes": "Adds privacy-safe Qwen performance telemetry to the private heartbeat. A 1-second local sampler records per-cycle prompt/completion tokens, runner numeric timing metrics, native completion tok/s when available, and a clearly labeled observed cycle-wall tok/s fallback that includes tool/runner overhead. Heartbeat includes rolling min/avg/max and recent samples for before/after performance comparisons. Preserves 6.3.18 deterministic benchmark Script creation recovery and 6.3.17 structured benchmark reporting."
 }
