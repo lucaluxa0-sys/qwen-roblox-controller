@@ -1,0 +1,18 @@
+# Local secrets and state
+telemetry_secret.txt
+*.token
+*.secret
+.env
+.env.*
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Local telemetry/state
+state.json
+checkpoint.json
+resume.txt
+proxy.log
+telemetry/
