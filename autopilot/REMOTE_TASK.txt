@@ -1,30 +1,42 @@
-Benchmark-Run-ID: scripting-s001-s024-run1-20260829T0638Z
+Benchmark-Run-ID: scripting-s001-s024-grouped-run2-20260829T0654Z
 Metadata note: the Benchmark-Run-ID is NOT a Roblox studio_id and must never be passed to a Studio tool.
 
-Run Qwen Roblox Capability Suite 01 — Scripting / Luau, batch S001-S024.
+Run Qwen Roblox Capability Suite 01 — Scripting / Luau, grouped batch S001-S024.
 
-This is an autonomous executable benchmark, not a tutorial. Use the currently connected Roblox Studio through the enforced Roblox MCP tools.
+GOAL:
+Prove 24 individual scripting capabilities efficiently using TWO grouped capability packs, not 24 independent Studio missions.
+
+PACK SP01 — S001-S012:
+- Build one shared benchmark harness/source where possible.
+- Execute multiple deterministic assertions in the same Play session.
+- Use extra benchmark-created source only for cases that truly require source-repair/syntax evidence.
+- After all twelve tests are individually decided, emit the pack-complete marker using the documented BENCH_PACK_COMPLETE format with pack id SP01.
+
+PACK SP02 — S013-S024:
+- Reuse shared benchmark infrastructure where safe.
+- Execute the scope/types/nil assertions together.
+- Minimize source rewrites and Play start/stop transitions.
+- After all twelve tests are individually decided, emit the pack-complete marker using the documented BENCH_PACK_COMPLETE format with pack id SP02.
 
 SAFETY / ISOLATION:
 - Call supervisor_resume(new_chat=true) first.
-- If a saved studio_id is stale, call list_roblox_studios and use the actual connected Studio ID. Never guess or reuse the Benchmark-Run-ID as studio_id.
-- If Studio is in Play mode and an edit is required, stop Play safely first.
-- Do NOT modify any existing user scripts, instances, settings, assets, or player data.
-- Create benchmark artifacts only under ServerStorage.__QWEN_SCRIPT_BENCH__ and, only when a Script must execute in Play, ServerScriptService.__QWEN_SCRIPT_BENCH__.
-- You may create, edit, run, inspect, and delete only benchmark-created artifacts.
-- Clean up benchmark-created artifacts at the end of the batch.
-- Follow all controller gates, authoritative rereads, Output checks, and runtime verification requirements.
-- Do not bypass script mutation policy with execute_luau writing Script.Source.
+- If a saved studio_id is stale, call list_roblox_studios and use an actual connected Studio ID. Never use the Benchmark-Run-ID or a Task/Pack identifier as studio_id.
+- Do not modify existing user scripts, instances, settings, assets, or player data.
+- Create benchmark artifacts only under ServerStorage.__QWEN_SCRIPT_BENCH__ and, only when runtime execution is required, ServerScriptService.__QWEN_SCRIPT_BENCH__.
+- You may create/edit/run/inspect/delete only benchmark-created artifacts.
+- Follow controller gates, authoritative rereads, Output checks, and runtime verification requirements.
+- Do not bypass script mutation policy by using execute_luau to write Script.Source.
+- Clean up every benchmark artifact at the end.
 
-SCORING:
-For every test ID below, actually perform the test with authoritative evidence. After the test is decided, emit exactly one marker in your normal response text:
-[BENCH:S###:PASS]
-or
-[BENCH:S###:PARTIAL:<short reason>]
-or
-[BENCH:S###:FAIL:<MODEL|CONTROLLER|MCP|ENV|UNSAFE> <short reason>]
+EFFICIENCY:
+- 280 catalog entries are capabilities, not 280 separate runs.
+- Shared setup, shared source, shared Play sessions, and shared Output retrieval are preferred whenever they still provide unambiguous evidence.
+- One Output pass may prove many assertions if each assertion is labeled with its test ID.
+- Do not stop/restart Play between tests unless required by evidence or controller policy.
 
-Do not mark PASS from reasoning alone. A runtime-dependent test needs runtime/Output evidence. A source-edit test needs authoritative reread evidence.
+RESULT PROTOCOL:
+For each concrete test S001 through S024, emit exactly one standalone result line using the BENCH result format. Use PASS only with authoritative evidence; otherwise PARTIAL or FAIL with MODEL, CONTROLLER, MCP, ENV, or UNSAFE reason.
+The result-format examples in this prompt are templates only and are not results.
 
 TESTS:
 - S001: Write valid Luau using arithmetic precedence, comparisons, booleans, strings, and parentheses; verify exact results.
@@ -52,8 +64,10 @@ TESTS:
 - S023: Validate conversion between strings and numbers.
 - S024: Repair a declaration-order bug where a helper captures an unavailable local.
 
-BATCH FINISH:
-1. Verify no benchmark artifacts remain.
-2. Report counts for PASS/PARTIAL/FAIL.
-3. Emit [BENCH_BATCH_COMPLETE:scripting-s001-s024-run1]
-4. When the controller gate is clear, emit [TASK_COMPLETE].
+FINISH:
+- Confirm all 24 tests have a result.
+- Confirm SP01 and SP02 each have a real pack-complete marker.
+- Verify no benchmark artifacts remain.
+- Report PASS/PARTIAL/FAIL counts.
+- Emit the real batch-complete marker for run id scripting-s001-s024-grouped-run2 only after all above steps are complete.
+- When controller gate is clear, emit [TASK_COMPLETE].
