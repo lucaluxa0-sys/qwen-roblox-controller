@@ -1532,13 +1532,21 @@ def _benchmark_events_for_run(rows: list[dict[str, Any]], run_id: str) -> list[s
 
 
 def _latest_verified_benchmark_events(rows: list[dict[str, Any]]) -> tuple[str, list[str]]:
-    run_id = ""
+    # Prefer the latest canonical scripting-certification run whenever one
+    # exists. This prevents accidental object/path names (for example SP07_A)
+    # from displacing the real certification in heartbeat authority. Retain a
+    # generic fallback for controller self-tests and future non-scripting suites.
+    latest_any = ""
+    latest_scripting = ""
     for row in rows:
         if not isinstance(row, dict) or row.get("event_kind") != "benchmark_record":
             continue
         candidate = str(row.get("benchmark_run_id") or "").strip()
+        if _BENCH_RUN_ID_RE.fullmatch(candidate):
+            latest_any = candidate
         if _SCRIPTING_BENCH_RUN_ID_RE.fullmatch(candidate):
-            run_id = candidate
+            latest_scripting = candidate
+    run_id = latest_scripting or latest_any
     if not run_id:
         return "", []
     return run_id, _benchmark_events_for_run(rows, run_id)
@@ -1551,11 +1559,6 @@ def _validate_benchmark_record_request(
     run_id = str((args or {}).get("run_id") or "").strip()
     if not _BENCH_RUN_ID_RE.fullmatch(run_id):
         return [], "Benchmark run_id is required and must use only letters, digits, dot, underscore, colon, or hyphen."
-    if not _SCRIPTING_BENCH_RUN_ID_RE.fullmatch(run_id):
-        return [], (
-            "This controller-owned benchmark reporter is currently scoped to the scripting certification. "
-            "Use the exact task Benchmark-Run-ID beginning with 'scripting-s###-s###-'; short object/path names such as SP07_A are not benchmark run IDs."
-        )
 
     raw_results = (args or {}).get("results")
     if raw_results is None:
@@ -1573,9 +1576,6 @@ def _validate_benchmark_record_request(
         reason = str(row.get("reason") or "").strip()
         if not _BENCH_TEST_ID_RE.fullmatch(test_id):
             return [], f"Invalid benchmark test_id {test_id!r}; expected S###."
-        test_number = int(test_id[1:])
-        if test_number < 1 or test_number > 280:
-            return [], f"Invalid scripting capability {test_id}; expected S001-S280."
         if status not in {"PASS", "PARTIAL", "FAIL"}:
             return [], f"Invalid status for {test_id}: {status!r}."
         if test_id in seen_ids:
@@ -5441,8 +5441,33 @@ SUPERVISOR_BENCHMARK_RECORD_TOOL = {
 }
 
 
+def _scripting_benchmark_submission_policy_reason(args: dict[str, Any]) -> str | None:
+    run_id = str((args or {}).get("run_id") or "").strip()
+    if not _SCRIPTING_BENCH_RUN_ID_RE.fullmatch(run_id):
+        return (
+            "This controller-owned benchmark reporter is currently scoped to the scripting certification. "
+            "Use the exact task Benchmark-Run-ID beginning with 'scripting-s###-s###-'; short object/path names such as SP07_A are not benchmark run IDs."
+        )
+    raw_results = (args or {}).get("results")
+    if raw_results is None:
+        raw_results = []
+    if isinstance(raw_results, list):
+        for row in raw_results:
+            if not isinstance(row, dict):
+                continue
+            test_id = str(row.get("test_id") or "").upper().strip()
+            if _BENCH_TEST_ID_RE.fullmatch(test_id):
+                test_number = int(test_id[1:])
+                if test_number < 1 or test_number > 280:
+                    return f"Invalid scripting capability {test_id}; expected S001-S280."
+    return None
+
+
 def _record_benchmark_submission(args: dict[str, Any]) -> tuple[dict[str, Any] | None, str | None]:
     run_id = str((args or {}).get("run_id") or "").strip()
+    policy_reason = _scripting_benchmark_submission_policy_reason(args or {})
+    if policy_reason:
+        return None, policy_reason
     rows = _tail_jsonl_safe(TELEMETRY_AUTOPILOT_FILE, BENCHMARK_EVENT_HISTORY_ROWS)
     existing = _benchmark_events_for_run(rows, run_id)
     markers, reason = _validate_benchmark_record_request(args or {}, existing)
@@ -6897,10 +6922,10 @@ def self_test_main() -> int:
     # V6.3.26 regression: benchmark run IDs are canonical scripting-run IDs,
     # accidental object/path names cannot displace the real certification run,
     # and scripting result IDs are constrained to S001-S280.
-    _, bad_run_reason_6326 = _validate_benchmark_record_request({
+    bad_run_reason_6326 = _scripting_benchmark_submission_policy_reason({
         "run_id": "SP07_A",
         "results": [{"test_id": "S007", "status": "PASS"}],
-    }, [])
+    })
     if not bad_run_reason_6326 or "scripting-s###-s###-" not in bad_run_reason_6326:
         failures.append(f"V6.3.26 bogus object-name benchmark run was not rejected: {bad_run_reason_6326!r}")
 
@@ -6911,10 +6936,10 @@ def self_test_main() -> int:
     if valid_run_reason_6326 or not valid_run_markers_6326 or "[BENCH:S081:PASS:verified]" not in valid_run_markers_6326:
         failures.append(f"V6.3.26 valid scripting run was rejected: {valid_run_reason_6326!r} {valid_run_markers_6326!r}")
 
-    _, out_of_range_reason_6326 = _validate_benchmark_record_request({
+    out_of_range_reason_6326 = _scripting_benchmark_submission_policy_reason({
         "run_id": "scripting-s001-s280-full-selftest",
         "results": [{"test_id": "S999", "status": "PASS"}],
-    }, [])
+    })
     if not out_of_range_reason_6326 or "S001-S280" not in out_of_range_reason_6326:
         failures.append(f"V6.3.26 out-of-range scripting result was not rejected: {out_of_range_reason_6326!r}")
 
