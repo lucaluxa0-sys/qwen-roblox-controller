@@ -1,53 +1,40 @@
-Task-Instance: scripting-s001-s024-structured-run6-resume-sp02-20260829T0818Z
+Task-Instance: scripting-s001-s024-structured-run6-resume-sp02-v620-20260829T0830Z
 Benchmark-Run-ID: scripting-s001-s024-structured-run6-20260829T0806Z
 These IDs are metadata only. NEVER use them as studio_id.
 
-RESUME RUN6 — DO NOT RESTART SP01
+RESUME RUN6 — SP01 IS DONE.
+Controller-verified progress is authoritative:
+- S001-S012 PASS
+- tests_seen=12
+- pack_complete=SP01
+Do not touch, reread, rerun, or rereport SP01.
 
-AUTHORITATIVE CONTROLLER-VERIFIED PROGRESS ALREADY EXISTS:
-- run_id: scripting-s001-s024-structured-run6-20260829T0806Z
-- tests_seen: 12
-- pass: 12
-- partial: 0
-- fail: 0
-- pack_complete: SP01
-- S001-S012 are DONE.
-DO NOT script_read SP01.
-DO NOT playtest SP01.
-DO NOT read SP01 Output.
-DO NOT call supervisor_benchmark_record for S001-S012 again.
-DO NOT touch SP01 at all.
+LIVE CONTROLLER: 6.3.20.
 
-CONTROLLER
-6.3.19 is live. It includes:
-- 6.3.17 supervisor_benchmark_record
-- 6.3.18 deterministic missing benchmark Script creation recovery.
+ONLY GOAL: finish SP02 S013-S024, clean up, and complete this same run.
 
-ONLY GOAL NOW: FINISH SP02 S013-S024, CLEAN UP, COMPLETE THIS SAME RUN.
-
-EXACT SP02 TARGET:
+EXACT TARGET:
 ServerScriptService.__QWEN_SCRIPT_BENCH__.SP02_ScriptingTests
 
-KNOWN AUTHORITATIVE FACT:
-Previous exact script_read proved SP02_ScriptingTests does not exist while Studio is Edit.
-Therefore do NOT multi_edit the nonexistent path and do NOT re-prove SP01.
-
-NEXT ACTION:
-1. Resolve a stale studio_id with list_roblox_studios only if needed.
-2. Use the official tool named create_instances to create exactly ONE Script:
-   name: SP02_ScriptingTests
-   parent: ServerScriptService.__QWEN_SCRIPT_BENCH__
-   Source EXACTLY:
+AUTHORITATIVE CURRENT STATE:
+- SP02 Script has now been created successfully by official multi_edit.
+- Immediate authoritative script_read succeeded.
+- Current source is EXACTLY:
 -- QWEN_CONTROLLER_SCRIPT_BOOTSTRAP
-3. NEVER use execute_luau to create Script/LocalScript/ModuleScript or assign Source.
-4. Immediately script_read:
-   ServerScriptService.__QWEN_SCRIPT_BENCH__.SP02_ScriptingTests
-5. Require authoritative source to be exactly the bootstrap line.
-6. Use one transactional multi_edit replacing the exact bootstrap line with the real SP02 harness.
-7. Immediately script_read again.
-8. Play/Output verify SP02 once, efficiently.
+- Do NOT create it again.
+- Do NOT use create_instances.
+- Do NOT use execute_luau for Script creation or Source assignment.
 
-SP02 DECISIONS:
+MANDATORY NEXT ACTION:
+Use ONE transactional multi_edit on the exact target with:
+old_string EXACTLY:
+-- QWEN_CONTROLLER_SCRIPT_BOOTSTRAP
+new_string:
+the complete real SP02 harness for S013-S024.
+Do not use any larger/stale old_string.
+Then immediately script_read the exact target and treat that reread as authoritative.
+
+SP02:
 S013 local scope/no accidental globals
 S014 block shadowing
 S015 nil-safe missing child
@@ -61,28 +48,22 @@ S022 stale Instance reference after destroy/recreate
 S023 string/number conversion validation
 S024 declaration-order/closure repair
 
-After real evidence, call supervisor_benchmark_record ONCE:
-run_id = "scripting-s001-s024-structured-run6-20260829T0806Z"
-results = exactly 12 rows S013-S024 with PASS/PARTIAL/FAIL and short evidence-based reasons
-pack_complete = ["SP02"]
+After authoritative reread, Play/Output verify SP02 once efficiently.
 
-REQUIRE returned benchmark_progress:
-- tests_seen = 24
-- SP01 and SP02 both present
-If rejected, repair only the missing SP02 decisions. Do not redo SP01.
+Then call supervisor_benchmark_record ONCE:
+run_id="scripting-s001-s024-structured-run6-20260829T0806Z"
+results=exactly S013-S024 with evidence-based PASS/PARTIAL/FAIL reasons
+pack_complete=["SP02"]
 
-CLEANUP + BATCH:
-- remove all benchmark-created artifacts under ServerScriptService.__QWEN_SCRIPT_BENCH__
-- verify cleanup
-- call supervisor_benchmark_record:
-  run_id = "scripting-s001-s024-structured-run6-20260829T0806Z"
-  batch_complete = "scripting-s001-s024-structured-run6-20260829T0806Z"
-- require batch marker accepted
-- only with controller gate clear emit [TASK_COMPLETE].
+Require controller benchmark_progress:
+- tests_seen=24
+- SP01 and SP02 present
 
-EFFICIENCY / RECOVERY:
-- No pathless search_game_tree.
-- No repeated identical mutation.
-- If Studio ID is stale, list_roblox_studios then continue.
-- If RemoteDisconnected occurs, resume at SP02 from authoritative state.
-- If a deliberately invalid-source capability is blocked by safety, record PARTIAL with UNSAFE reason and continue.
+Then remove benchmark artifacts under ServerScriptService.__QWEN_SCRIPT_BENCH__, verify cleanup, and call supervisor_benchmark_record with:
+run_id="scripting-s001-s024-structured-run6-20260829T0806Z"
+batch_complete="scripting-s001-s024-structured-run6-20260829T0806Z"
+
+Only emit [TASK_COMPLETE] after the controller accepts the batch marker and gate is clear.
+
+EFFICIENCY:
+No pathless search_game_tree. No repeated identical mutation. If studio_id is stale, list_roblox_studios once and continue from the same verified state.
