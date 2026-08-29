@@ -39,8 +39,8 @@ import urllib.request
 from pathlib import Path
 from typing import Any
 
-APP_NAME = "Qwen Roblox Enforced Proxy V6.3.28"
-VERSION = "6.3.28"
+APP_NAME = "Qwen Roblox Enforced Proxy V6.3.29"
+VERSION = "6.3.29"
 
 LOCALAPPDATA = Path(os.environ.get("LOCALAPPDATA", str(Path.home())))
 STATE_DIR = LOCALAPPDATA / "QwenRobloxEnforcedProxy"
@@ -2581,6 +2581,55 @@ def _benchmark_missing_script_create_matches(args: dict[str, Any] | None, target
     return matched
 
 
+def _benchmark_missing_script_bootstrap_execute_luau(
+    args: dict[str, Any] | None,
+    target: str,
+    intended_class: str | None,
+) -> bool:
+    """Recognize one exact, inert execute_luau fallback for a proven-missing benchmark ModuleScript/LocalScript.
+
+    The live Roblox MCP in this environment does not reliably expose/select create_instances.
+    This fallback remains deterministic: exact target, exact declared class, exact local names,
+    Source assigned before parenting, and Source is only the inert controller bootstrap.
+    """
+    cls = str(intended_class or "").strip()
+    if cls not in {"ModuleScript", "LocalScript"}:
+        return False
+    wanted = str(target or "").strip()
+    if wanted.lower().startswith("game."):
+        wanted = wanted[5:]
+    if not wanted or "__qwen_script_bench__" not in wanted.lower():
+        return False
+    parts = wanted.split(".")
+    if len(parts) < 3 or any(not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", part) for part in parts):
+        return False
+    parent_expr = "game." + ".".join(parts[:-1])
+    name = parts[-1]
+    expected = "\n".join([
+        f"local __qwen_parent = {parent_expr}",
+        f'local __qwen_script = Instance.new("{cls}")',
+        f'__qwen_script.Name = "{name}"',
+        f'__qwen_script.Source = "{SCRIPT_BOOTSTRAP_SOURCE}"',
+        "__qwen_script.Parent = __qwen_parent",
+    ])
+    code = (args or {}).get("code")
+    return isinstance(code, str) and normalize_source(code) == normalize_source(expected)
+
+
+def _active_benchmark_execute_bootstrap_target(args: dict[str, Any] | None) -> str:
+    with _state_lock:
+        state = copy.deepcopy(STATE)
+    blocker = state.get("current_blocker")
+    trace_gate = state.get("qwen_decision_trace_gate") or {}
+    if not isinstance(blocker, dict) or blocker.get("classification") != "benchmark_script_missing":
+        return ""
+    target = str(blocker.get("path") or "")
+    intended_class = str(trace_gate.get("intended_script_class") or "").strip()
+    if _benchmark_missing_script_bootstrap_execute_luau(args, target, intended_class):
+        return target
+    return ""
+
+
 def _benchmark_missing_script_bootstrap_multi_edit(args: dict[str, Any] | None, target: str) -> bool:
     """Recognize the official MCP's safe create-via-multi_edit bootstrap transaction."""
     actual = extract_target(args or {})
@@ -2603,19 +2652,25 @@ def _benchmark_missing_script_message(target: str) -> str:
         "Choose the creation path required by the task's intended class. "
         "For a normal Script, the current official MCP can create it through exactly one multi_edit on this same path "
         f"with old_string='' and new_string={SCRIPT_BOOTSTRAP_SOURCE!r}. "
-        "For a ModuleScript or LocalScript, use create_instances with the exact intended class, "
+        "For a ModuleScript or LocalScript, first prefer create_instances with the exact intended class, "
         f"name={name!r}, parent={parent!r}, and Source exactly {SCRIPT_BOOTSTRAP_SOURCE!r}. "
-        "No other Source is allowed at creation. Then script_read the exact new path before replacing the bootstrap. "
-        "Do not use execute_luau to create Script-like objects or assign Source."
+        "If create_instances is unavailable/not selectable in the live MCP, the controller also accepts exactly one "
+        "deterministic execute_luau fallback after a fresh intended_script_class trace: "
+        f"local __qwen_parent = game.{parent}; local __qwen_script = Instance.new(<declared class>); "
+        f"__qwen_script.Name = {name!r}; __qwen_script.Source = {SCRIPT_BOOTSTRAP_SOURCE!r}; "
+        "__qwen_script.Parent = __qwen_parent. No extra statements are allowed. "
+        "Then script_read the exact new path before replacing the bootstrap."
     )
 
 
 def script_creation_policy_reason(name: str, args: dict[str, Any] | None) -> str | None:
-    """Allow Script creation only through a tiny inert bootstrap source.
+    """Allow Script-like creation only through deterministic inert bootstrap paths.
 
     create_instances may create Script-like objects only with the inert bootstrap.
-    execute_luau is never allowed to create Script-like objects because that path
-    cannot guarantee the bootstrap Source at creation time.
+    V6.3.29 additionally allows one exact execute_luau fallback solely for a
+    controller-proven-missing benchmark ModuleScript/LocalScript whose exact class
+    was declared in the fresh decision trace. Arbitrary execute_luau creation or
+    Source assignment remains blocked.
     """
     n = (name or "").lower()
     if n == "execute_luau":
@@ -2625,10 +2680,13 @@ def script_creation_policy_reason(name: str, args: dict[str, Any] | None) -> str
             code,
             re.IGNORECASE,
         ):
+            if _active_benchmark_execute_bootstrap_target(args):
+                return None
             return (
-                "Blocked: Script/LocalScript/ModuleScript creation through execute_luau is not allowed. "
-                f"Use create_instances with Source exactly {SCRIPT_BOOTSTRAP_SOURCE!r}, then call script_read "
-                "on the exact new path and replace the bootstrap with the official transactional script edit tool."
+                "Blocked: arbitrary Script/LocalScript/ModuleScript creation through execute_luau is not allowed. "
+                "For a proven-missing benchmark ModuleScript/LocalScript only, use a fresh intended_script_class trace "
+                "and the exact controller-prescribed inert execute_luau bootstrap template with no extra statements. "
+                f"Otherwise use create_instances with Source exactly {SCRIPT_BOOTSTRAP_SOURCE!r}."
             )
         return None
     if n != "create_instances":
@@ -3545,12 +3603,24 @@ def build_expected_source(name: str, args: dict[str, Any] | None) -> tuple[str |
     target = extract_target(args)
     current = source_cache_get(target)
 
-    # Source rewriting through execute_luau is impossible to simulate safely from
-    # arbitrary code. Force the model through a script edit tool instead.
+    # Arbitrary Source rewriting through execute_luau is impossible to simulate
+    # safely. V6.3.29 has one deterministic exception: exact inert bootstrap
+    # creation for a proven-missing benchmark ModuleScript/LocalScript.
     if n == "execute_luau":
+        recovery_target = _active_benchmark_execute_bootstrap_target(args)
+        if recovery_target:
+            candidate = SCRIPT_BOOTSTRAP_SOURCE
+            defects = structural_source_defects(candidate, "", args, name)
+            if defects:
+                return candidate, (
+                    "Blocked by V5 compiler transaction: the exact benchmark execute_luau bootstrap failed preflight. "
+                    + " | ".join(defects)
+                ), defects
+            return candidate, None, []
         return None, (
             "Blocked by V5 transaction invariant: execute_luau may not rewrite Script.Source. "
-            "Use the official script edit/write tool after script_read so the controller can simulate and validate the exact candidate first."
+            "Only the exact controller-prescribed inert bootstrap creation for a proven-missing benchmark "
+            "ModuleScript/LocalScript is exempt. Existing Source must use the official transactional script edit tool."
         ), []
 
     if not target:
@@ -4490,6 +4560,13 @@ def block_reason_for_call(name: str, args: dict[str, Any] | None) -> str | None:
                             f"and Source exactly {SCRIPT_BOOTSTRAP_SOURCE!r}."
                         )
                     return _benchmark_missing_script_message(bpath)
+            elif n == "execute_luau":
+                trace_gate = state.get("qwen_decision_trace_gate") or {}
+                intended_class = str(trace_gate.get("intended_script_class") or "").strip()
+                if _benchmark_missing_script_bootstrap_execute_luau(args, bpath, intended_class or None):
+                    required_action = True
+                else:
+                    return _benchmark_missing_script_message(bpath)
             else:
                 return _benchmark_missing_script_message(bpath)
 
@@ -4716,7 +4793,9 @@ def on_forwarded_call(name: str, args: dict[str, Any] | None) -> None:
     def mutate(state: dict[str, Any]):
         state["forwarded_count"] = int(state.get("forwarded_count", 0)) + 1
         target = extract_target(args)
-        if target and ("script" in name.lower() or name.lower() in SCRIPT_MUTATION_NAMES):
+        if not target and name.lower() == "execute_luau":
+            target = _active_benchmark_execute_bootstrap_target(args)
+        if target and ("script" in name.lower() or name.lower() in SCRIPT_MUTATION_NAMES or name.lower() == "execute_luau"):
             state["last_script_target"] = target
     state_update(mutate)
     account_context_traffic(chars=len(name) + len(json_text(args or {})), tool_call=True)
@@ -5980,6 +6059,8 @@ def handle_parent_message(child: subprocess.Popen[str], message: dict[str, Any])
                     emit(mcp_tool_error_response(request_id, preflight_reason))
                 return
             target = extract_target(args)
+            if not target and name.lower() == "execute_luau":
+                target = _active_benchmark_execute_bootstrap_target(args)
             previous = source_cache_get(target)
             mutation_plan = {
                 "target": target,
@@ -6018,6 +6099,7 @@ AUTOPILOT_SYSTEM_PROMPT = """You are Qwen operating Roblox Studio through the ma
 The controller is your executive function and the official Roblox Studio MCP is your hands.
 Work autonomously and prefer tool evidence over speculation.
 Follow every SUPERVISOR BLOCK/NEXT instruction literally.
+When a task gives an exact immediate tool call, make that tool call before prose, alternative methods, reinspection, or speculative reasoning.
 Maintain a concise observable decision trace with supervisor_decision_trace. This is an operational summary, not private chain-of-thought.
 Call supervisor_decision_trace when strategy changes, before a mutation/play/benchmark commit, or after an error changes the plan; do not spam routine reads.
 Preserve completed benchmark harness Script/LocalScript/ModuleScript objects for later inspection; temporary runtime objects may still be cleaned up for isolation.
@@ -6939,6 +7021,65 @@ def self_test_main() -> int:
     latest_run, latest_events = _latest_verified_benchmark_events(fake_rows)
     if latest_run != "new-run" or latest_events != ["[BENCH:S013:PASS]"]:
         failures.append(f"V6.3.17 benchmark run scoping failed: {latest_run!r} {latest_events!r}")
+
+    # V6.3.29 regression: live-MCP fallback for a proven-missing
+    # ModuleScript is exact and inert; arbitrary execute_luau creation remains blocked.
+    exec_target_6329 = "ServerScriptService.__QWEN_SCRIPT_BENCH__.SP07_Function"
+    exec_args_6329 = {
+        "code": "\n".join([
+            "local __qwen_parent = game.ServerScriptService.__QWEN_SCRIPT_BENCH__",
+            'local __qwen_script = Instance.new("ModuleScript")',
+            '__qwen_script.Name = "SP07_Function"',
+            f'__qwen_script.Source = "{SCRIPT_BOOTSTRAP_SOURCE}"',
+            "__qwen_script.Parent = __qwen_parent",
+        ])
+    }
+    exec_state_6329 = new_state()
+    exec_state_6329["studio_mode"] = "edit"
+    exec_state_6329["current_blocker"] = {
+        "classification": "benchmark_script_missing",
+        "path": exec_target_6329,
+        "stage": "need_create_bootstrap",
+        "message": "missing",
+    }
+    exec_state_6329["qwen_decision_trace_gate"] = {
+        "last_at": time.time(),
+        "consumed": False,
+        "intended_script_class": "ModuleScript",
+    }
+    with _state_lock:
+        saved_state_6329 = copy.deepcopy(STATE)
+        STATE.clear()
+        STATE.update(copy.deepcopy(exec_state_6329))
+    try:
+        if script_creation_policy_reason("execute_luau", exec_args_6329):
+            failures.append("V6.3.29 exact execute_luau ModuleScript bootstrap policy was rejected")
+        exec_reason_6329 = block_reason_for_call("execute_luau", exec_args_6329)
+        if exec_reason_6329:
+            failures.append(f"V6.3.29 exact execute_luau ModuleScript bootstrap was blocked: {exec_reason_6329!r}")
+        exec_candidate_6329, exec_preflight_6329, exec_defects_6329 = build_expected_source("execute_luau", exec_args_6329)
+        if exec_preflight_6329 or exec_candidate_6329 != SCRIPT_BOOTSTRAP_SOURCE or exec_defects_6329:
+            failures.append(
+                f"V6.3.29 exact execute_luau bootstrap preflight failed: "
+                f"{exec_candidate_6329!r} {exec_preflight_6329!r} {exec_defects_6329!r}"
+            )
+        bad_exec_args_6329 = {
+            "code": exec_args_6329["code"].replace(
+                f'__qwen_script.Source = "{SCRIPT_BOOTSTRAP_SOURCE}"',
+                '__qwen_script.Source = "return {}"',
+            )
+        }
+        if not script_creation_policy_reason("execute_luau", bad_exec_args_6329):
+            failures.append("V6.3.29 arbitrary execute_luau ModuleScript Source was not blocked")
+        wrong_class_exec_6329 = {
+            "code": exec_args_6329["code"].replace('Instance.new("ModuleScript")', 'Instance.new("Script")')
+        }
+        if not script_creation_policy_reason("execute_luau", wrong_class_exec_6329):
+            failures.append("V6.3.29 wrong-class execute_luau benchmark creation was not blocked")
+    finally:
+        with _state_lock:
+            STATE.clear()
+            STATE.update(saved_state_6329)
 
     # V6.3.27 regression: a fresh decision trace can declare the exact
     # script-like class for a missing benchmark object. Wrong-class creation
