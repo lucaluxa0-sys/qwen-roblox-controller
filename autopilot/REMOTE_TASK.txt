@@ -1,56 +1,42 @@
-Task-Instance: sp07-c-function-class-check-20260829T1134Z
+Task-Instance: sp07-function-create-unblock-20260829T1136Z
 Benchmark-Run-ID: scripting-s001-s024-structured-run6-20260829T0806Z
 
-SP07 CLASS SAFETY CHECK ONLY. NO BENCHMARK REPORTING.
+RESOLVE THE ACTIVE CONTROLLER BLOCKER ONLY.
 
-Known:
-- SP07_A = ModuleScript/bootstrap
-- SP07_B = ModuleScript/bootstrap
-- SP07_C was just created through legacy missing-path multi_edit and MUST be audited before any real source is installed.
-- SP07_Function still requires authoritative existence/class recovery.
+Active authoritative blocker:
+ServerScriptService.__QWEN_SCRIPT_BENCH__.SP07_Function is confirmed missing in Edit mode, stage=need_create_bootstrap.
 
-ACTIONS EXACTLY:
-1. script_read ServerScriptService.__QWEN_SCRIPT_BENCH__.SP07_C
-2. inspect_instance ServerScriptService.__QWEN_SCRIPT_BENCH__.SP07_C
-3. If SP07_C ClassName is NOT ModuleScript:
-   - supervisor_decision_trace:
-     goal="SP07_C wrong-class recovery required"
-     evidence=["observed exact ClassName from inspect_instance","SP07_C benchmark contract requires ModuleScript"]
-     decision="Stop before source install; supervisor must repair wrong class safely"
-     actual_result="SP07_C ClassName=<observed>"
-     next_action="await supervisor recovery task"
-     confidence="high"
-   - emit [TASK_COMPLETE] and STOP. Do not mutate SP07_C.
-4. If SP07_C is ModuleScript and source is exact bootstrap, continue.
-5. script_read ServerScriptService.__QWEN_SCRIPT_BENCH__.SP07_Function
-6. If missing:
-   - supervisor_decision_trace with intended_script_class="ModuleScript":
-     goal="Create missing SP07_Function ModuleScript bootstrap"
-     evidence=["exact SP07_Function path confirmed missing in Edit mode","benchmark contract requires ModuleScript"]
-     decision="Create exactly one ModuleScript SP07_Function with inert bootstrap"
-     next_action="create_instances exactly once"
-     confidence="high"
-   - create_instances exactly ONE object:
-     className="ModuleScript"
-     name="SP07_Function"
-     parent="ServerScriptService.__QWEN_SCRIPT_BENCH__"
-     properties.Source="-- QWEN_CONTROLLER_SCRIPT_BOOTSTRAP"
-   - script_read exact SP07_Function
-   - inspect_instance exact SP07_Function
-7. Require SP07_Function ClassName=ModuleScript and exact bootstrap source.
-8. supervisor_decision_trace:
-   goal="Confirm SP07_C and SP07_Function class-safe bootstrap state"
-   evidence=["SP07_C=<exact class/source state>","SP07_Function=<exact class/source state>"]
-   decision="Both modules are safe for exact source installation"
-   actual_result="class audit complete"
-   next_action="await SP07 source-install continuation task"
+DO NOT read/audit SP07_C yet. The active blocker must be resolved first.
+DO NOT use multi_edit.
+DO NOT use execute_luau.
+DO NOT search.
+DO NOT benchmark-report.
+
+EXACT ACTIONS:
+1. supervisor_decision_trace with:
+   goal="Create missing SP07_Function as exact ModuleScript bootstrap"
+   evidence=["controller confirms exact SP07_Function path missing in Edit mode","SP07_Function benchmark contract requires ModuleScript"]
+   decision="Use create_instances exactly once with className ModuleScript and inert bootstrap Source"
+   expected_result="SP07_Function exists as ModuleScript with exact bootstrap source"
+   next_action="create_instances exactly once"
    confidence="high"
-9. emit [TASK_COMPLETE] and STOP.
+   intended_script_class="ModuleScript"
+2. create_instances EXACTLY ONCE with ONE instance:
+   className="ModuleScript"
+   name="SP07_Function"
+   parent="ServerScriptService.__QWEN_SCRIPT_BENCH__"
+   properties:
+     Source="-- QWEN_CONTROLLER_SCRIPT_BOOTSTRAP"
+3. script_read exactly ServerScriptService.__QWEN_SCRIPT_BENCH__.SP07_Function
+4. inspect_instance exactly ServerScriptService.__QWEN_SCRIPT_BENCH__.SP07_Function
+5. Require ClassName=ModuleScript and exact bootstrap source.
+6. supervisor_decision_trace:
+   goal="Confirm SP07_Function blocker resolved"
+   evidence=["exact ClassName=ModuleScript","source matches inert bootstrap"]
+   decision="Stop after blocker resolution"
+   actual_result="SP07_Function ModuleScript bootstrap verified"
+   next_action="await SP07_C audit/source continuation task"
+   confidence="high"
+7. Emit [TASK_COMPLETE] and STOP.
 
-FORBIDDEN:
-- multi_edit
-- any source install beyond inert create_instances bootstrap
-- Play
-- supervisor_benchmark_record
-- inspecting anything else
-- S001-S080 benchmark submissions
+No other tool calls.
