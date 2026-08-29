@@ -39,8 +39,8 @@ import urllib.request
 from pathlib import Path
 from typing import Any
 
-APP_NAME = "Qwen Roblox Enforced Proxy V6.3.11"
-VERSION = "6.3.11"
+APP_NAME = "Qwen Roblox Enforced Proxy V6.3.12"
+VERSION = "6.3.12"
 
 LOCALAPPDATA = Path(os.environ.get("LOCALAPPDATA", str(Path.home())))
 STATE_DIR = LOCALAPPDATA / "QwenRobloxEnforcedProxy"
@@ -2015,10 +2015,25 @@ def _script_creation_rows(value: Any) -> list[tuple[str, str | None]]:
 def script_creation_policy_reason(name: str, args: dict[str, Any] | None) -> str | None:
     """Allow Script creation only through a tiny inert bootstrap source.
 
-    This gives the model a deterministic path for creating a new Script without
-    permitting create_instances to become a blind Script.Source bypass.
+    create_instances may create Script-like objects only with the inert bootstrap.
+    execute_luau is never allowed to create Script-like objects because that path
+    cannot guarantee the bootstrap Source at creation time.
     """
-    if (name or "").lower() != "create_instances":
+    n = (name or "").lower()
+    if n == "execute_luau":
+        code = (args or {}).get("code")
+        if isinstance(code, str) and re.search(
+            r"Instance\s*\.\s*new\s*\(\s*['\"](?:Script|LocalScript|ModuleScript)['\"]",
+            code,
+            re.IGNORECASE,
+        ):
+            return (
+                "Blocked: Script/LocalScript/ModuleScript creation through execute_luau is not allowed. "
+                f"Use create_instances with Source exactly {SCRIPT_BOOTSTRAP_SOURCE!r}, then call script_read "
+                "on the exact new path and replace the bootstrap with the official transactional script edit tool."
+            )
+        return None
+    if n != "create_instances":
         return None
     rows = _script_creation_rows(args or {})
     if not rows:
@@ -2166,19 +2181,28 @@ def extract_script_source(text: str) -> str:
     return normalize_source(text)
 
 
-def source_cache_get(target: str) -> str:
+def source_cache_lookup(target: str) -> tuple[bool, str]:
+    """Return cache presence separately from source text so an empty Script is authoritative."""
     wanted = canonical_target(target)
     if not wanted:
-        return ""
+        return False, ""
     for key, value in list(SOURCE_CACHE.items()):
         k = canonical_target(key)
         if k == wanted or k.endswith(wanted) or wanted.endswith(k) or k.split(".")[-1] == wanted.split(".")[-1]:
-            return value
-    return ""
+            return True, value
+    return False, ""
+
+
+def source_cache_get(target: str) -> str:
+    return source_cache_lookup(target)[1]
+
+
+def source_cache_has(target: str) -> bool:
+    return source_cache_lookup(target)[0]
 
 
 def source_cache_set(target: str, source: str) -> None:
-    if target and source:
+    if target:
         SOURCE_CACHE[target] = normalize_source(source)
 
 
@@ -2936,7 +2960,7 @@ def build_expected_source(name: str, args: dict[str, Any] | None) -> tuple[str |
             "Blocked by V5 transaction invariant: script mutation has no deterministic target path. "
             "Use a script edit tool with an explicit script path/target."
         ), []
-    if not current:
+    if not source_cache_has(target):
         return None, (
             f"Blocked by V5 transaction invariant: no authoritative source snapshot is cached for {target}. "
             "Call script_read first; no blind script writes are allowed."
@@ -3887,7 +3911,7 @@ def block_reason_for_call(name: str, args: dict[str, Any] | None) -> str | None:
     # Existing-script edits must be grounded in a current source snapshot.
     if tool_is_script_mutation(name, args):
         target = extract_target(args)
-        if target and n in SCRIPT_MUTATION_NAMES and not source_cache_get(target):
+        if target and n in SCRIPT_MUTATION_NAMES and not source_cache_has(target):
             return (
                 f"Blocked: no authoritative source is cached for {target}. "
                 "Call script_read first, then edit the source that actually exists in Studio."
@@ -4147,7 +4171,7 @@ def on_tool_result(name: str, args: dict[str, Any] | None, response: dict[str, A
     if n == "script_read" and not is_error and "script not found at path" not in low:
         actual = extract_target(args)
         actual_source = extract_script_source(text)
-        if actual and actual_source:
+        if actual:
             source_cache_set(actual, actual_source)
 
         # V5 validates every authoritative read, not only proposed writes. This
@@ -5543,6 +5567,35 @@ def self_test_main() -> int:
     )
     if any("atomic edit changes" in x for x in bootstrap_defects):
         failures.append(f"V6.3.11 bootstrap replacement hit destructive-diff guard: {bootstrap_defects!r}")
+
+    # V6.3.12 regression: a successful authoritative read of an empty Script is
+    # still a valid source snapshot, and execute_luau may not create Script-like
+    # instances that bypass the create_instances bootstrap policy.
+    empty_target = "game.ServerScriptService.__QWEN_SCRIPT_BENCH__.Empty"
+    SOURCE_CACHE.clear()
+    source_cache_set(empty_target, "")
+    if not source_cache_has(empty_target) or source_cache_get(empty_target) != "":
+        failures.append("V6.3.12 empty authoritative Script source was not cached")
+    empty_init_args = {
+        "file_path": empty_target,
+        "edits": [{"old_string": "", "new_string": SCRIPT_BOOTSTRAP_SOURCE, "replace_all": False}],
+    }
+    empty_candidate, empty_reason, _ = build_expected_source("multi_edit", empty_init_args)
+    if empty_reason or empty_candidate != SCRIPT_BOOTSTRAP_SOURCE:
+        failures.append(
+            f"V6.3.12 empty authoritative Script could not initialize bootstrap transactionally: "
+            f"candidate={empty_candidate!r} reason={empty_reason!r}"
+        )
+    if not script_creation_policy_reason(
+        "execute_luau",
+        {"code": 'local s = Instance.new("Script")\ns.Name = "Bench"\ns.Parent = game.ServerScriptService'},
+    ):
+        failures.append("V6.3.12 execute_luau Script creation bypass was not blocked")
+    if script_creation_policy_reason(
+        "execute_luau",
+        {"code": 'local f = Instance.new("Folder")\nf.Name = "Bench"\nf.Parent = game.ServerScriptService'},
+    ):
+        failures.append("V6.3.12 ordinary execute_luau Folder creation was incorrectly blocked")
 
     # V6.3 regression: controller-bug packets are eligible for automatic
     # GitHub handoff, while non-controller failures are not.
