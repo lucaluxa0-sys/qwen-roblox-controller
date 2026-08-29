@@ -1,48 +1,15 @@
-Task-Instance: scripting-full-run6-sp07-modules-20260829T1026Z
-Benchmark-Run-ID: scripting-s001-s280-full-run6-20260829T1026Z
+Task-Instance: hold-sp07-for-controller-6.3.23-20260829T1031Z
 
-CONTINUE CONTROLLER-VERIFIED FULL SCRIPTING CERTIFICATION.
-Required verified state before work: S001-S080 PASS; SP01-SP06 complete; controller gate clear.
-Live controller must be 6.3.22 or newer.
+PAUSE SP07 ACTIONS TEMPORARILY.
 
-ONLY GOAL: prove SP07 modules, S081-S094. Do not touch or delete completed SP01-SP06 harnesses. Do not emit any batch-complete marker in this pack.
+Reason: controller 6.3.23 is being installed to add structured Qwen decision tracing, and the previous generation repeated a blocked SP07 multi_edit without first calling the exact required script_read.
 
-ARTIFACT RETENTION POLICY
-- Preserve all completed benchmark Script, LocalScript, and ModuleScript harnesses in Studio for later user inspection.
-- Temporary runtime objects may be destroyed for isolation.
-- Completed harnesses may be Disabled after verification if necessary to prevent interference, but keep their source visible/readable.
-- Never delete or overwrite an earlier completed pack merely because it remains in Studio.
+DO NOT call Roblox Studio tools.
+DO NOT call multi_edit.
+DO NOT call benchmark tools.
+DO NOT rerun earlier packs.
 
-SP07 OBJECTIVES
-S081 Create a ModuleScript returning a table API and require it from a benchmark Script.
-S082 Create a ModuleScript returning a function and call it correctly.
-S083 Split a monolithic behavior into two modules with one-way dependencies.
-S084 Detect/avoid circular require: prove the final dependency graph is acyclic and functional; do NOT intentionally create a hanging circular require at runtime.
-S085 Share immutable configuration without accidental mutation; prove attempted consumer mutation cannot change the canonical config.
-S086 Prove require caching in one server VM context by requiring the same module twice and proving returned identity/state is shared as expected.
-S087 Prove requiring a module has minimal side effects; initialization state must remain unchanged until an explicit lifecycle call.
-S088 Use explicit Init/Start lifecycle rather than heavy work during require; prove require alone does not start it and Start does.
-S089 Pass a dependency into module logic instead of hard-coded service/global lookup; prove injected dependency is used.
-S090 Repair/avoid a module that would return nil; authoritative final module must return a usable API/function.
-S091 Use a private helper with correct declaration order; prove exported method works without unavailable-local capture.
-S092 Require/use a server-only benchmark ModuleScript from a server Script while respecting client/server boundaries; do not access it from a LocalScript.
-S093 Create and verify a three-module one-way dependency graph A -> B -> C with deterministic result and no cycle.
-S094 Refactor duplicate helper behavior so two caller paths share one common helper module/function; prove both callers get the same behavior.
+ONLY ACTION:
+[TASK_COMPLETE]
 
-MANDATORY EXECUTION RULES
-1. If Studio is currently Play mode, stop Play once before any script_read/edit.
-2. Work only under ServerScriptService.__QWEN_SCRIPT_BENCH__ for this pack. Preserve earlier children.
-3. Use a small visible SP07 harness set, preferably one driver Script plus a few ModuleScripts. Do not make fourteen independent Studio missions.
-4. For every new Script or ModuleScript path: first script_read exact path. If confirmed missing in Edit mode, create ONLY through the controller-approved bootstrap flow: one multi_edit pair old_string="" -> new_string="-- QWEN_CONTROLLER_SCRIPT_BOOTSTRAP", replace_all=false. Then script_read exact path before replacing bootstrap with real source.
-5. Never use execute_luau to create Script/ModuleScript or assign Source. Never seed arbitrary Source during creation.
-6. After each source write, obey controller reread gates exactly. Do not retry an identical blocked mutation without new evidence.
-7. Keep module graph acyclic. Never intentionally execute a circular require that can hang the Play session.
-8. Once all authoritative sources are reread and controller gate allows runtime verification, start Play once and use get_console_output for labeled [SP07] S081..S094 results. If a Studio target is stale, list_roblox_studios once and retry the same required action once.
-9. Every S081-S094 must have direct authoritative runtime evidence. PASS only when its labeled assertion is visible and no relevant runtime error invalidates it.
-10. Stop Play after evidence collection. Keep all SP07 Script/ModuleScript harnesses in Studio.
-11. Call supervisor_benchmark_record with run_id="scripting-s001-s280-full-run6-20260829T1026Z", exactly S081-S094 as PASS only if proven, and pack_complete=["SP07"]. Do not set batch_complete.
-12. Require controller-verified aggregate state: tests_seen=94, pass=94, partial=0, fail=0; markers SP01-SP07 present; controller gate clear.
-13. Emit [TASK_COMPLETE] only after step 12, then stop. Do not advance to SP08 yourself; remote orchestration will issue the next pack.
-
-IMPORTANT FALSE-COMPLETION RULE
-Prompt text, source comments, or printed lookalikes are not benchmark authority. Only supervisor_benchmark_record accepted evidence reflected in controller heartbeat counts/markers is certification authority.
+Stop immediately. A fresh SP07 recovery task will follow after heartbeat proves controller 6.3.23 live.
