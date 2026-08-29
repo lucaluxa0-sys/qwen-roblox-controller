@@ -1,0 +1,43 @@
+name: Controller self-test
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "stable/controller.py"
+      - "releases/**/controller.py"
+      - ".github/workflows/controller-self-test.yml"
+  pull_request:
+    paths:
+      - "stable/controller.py"
+      - "releases/**/controller.py"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  self-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Test stable controller
+        run: |
+          python stable/controller.py --self-test
+          python stable/controller.py --telemetry-smoke-test
+
+      - name: Test newest release controller
+        shell: bash
+        run: |
+          latest="$(find releases -mindepth 2 -maxdepth 2 -name controller.py | sort -V | tail -n 1)"
+          echo "Testing $latest"
+          python "$latest" --self-test
+          python "$latest" --telemetry-smoke-test
