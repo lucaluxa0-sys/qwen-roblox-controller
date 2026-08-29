@@ -39,8 +39,8 @@ import urllib.request
 from pathlib import Path
 from typing import Any
 
-APP_NAME = "Qwen Roblox Enforced Proxy V6.3.24"
-VERSION = "6.3.24"
+APP_NAME = "Qwen Roblox Enforced Proxy V6.3.25"
+VERSION = "6.3.25"
 
 LOCALAPPDATA = Path(os.environ.get("LOCALAPPDATA", str(Path.home())))
 STATE_DIR = LOCALAPPDATA / "QwenRobloxEnforcedProxy"
@@ -2492,7 +2492,13 @@ def _script_creation_rows(value: Any) -> list[tuple[str, str | None]]:
 
 
 def _benchmark_missing_script_create_matches(args: dict[str, Any] | None, target: str) -> bool:
-    """True only when create_instances contains the exact missing benchmark Script bootstrap."""
+    """True only when create_instances contains the exact missing benchmark Script-like bootstrap.
+
+    A missing benchmark path can intentionally be a Script, LocalScript, or
+    ModuleScript. The class is supplied explicitly by create_instances; source
+    must remain the inert controller bootstrap and the name/parent must exactly
+    match the proven-missing path.
+    """
     wanted = canonical_target(target)
     if not wanted or "__qwen_script_bench__" not in wanted.lower() or "." not in wanted:
         return False
@@ -2532,7 +2538,7 @@ def _benchmark_missing_script_create_matches(args: dict[str, Any] | None, target
 
         if (
             isinstance(cls, str)
-            and cls.lower() == "script"
+            and cls.lower() in SCRIPT_CLASSES
             and str(name or "").lower() == expected_name.lower()
             and canonical_target(str(parent or "")) == canonical_target(expected_parent)
             and normalize_source(str(source or "")) == SCRIPT_BOOTSTRAP_SOURCE
@@ -2563,12 +2569,17 @@ def _benchmark_missing_script_bootstrap_multi_edit(args: dict[str, Any] | None, 
 
 def _benchmark_missing_script_message(target: str) -> str:
     wanted = canonical_target(target)
+    parent = ".".join((wanted or target).split(".")[:-1])
+    name = (wanted or target).split(".")[-1]
     return (
-        f"Benchmark Script {wanted or target} is confirmed missing in Edit mode. "
-        "The official Roblox Studio MCP creates a missing Script through multi_edit. "
-        f"Use exactly one multi_edit on this same path with old_string='' and new_string={SCRIPT_BOOTSTRAP_SOURCE!r}. "
-        "No other source is allowed for creation. Then script_read that exact path before replacing the bootstrap with the real harness. "
-        "Do not use execute_luau to create the Script or assign Script.Source."
+        f"Benchmark code object {wanted or target} is confirmed missing in Edit mode. "
+        "Choose the creation path required by the task's intended class. "
+        "For a normal Script, the current official MCP can create it through exactly one multi_edit on this same path "
+        f"with old_string='' and new_string={SCRIPT_BOOTSTRAP_SOURCE!r}. "
+        "For a ModuleScript or LocalScript, use create_instances with the exact intended class, "
+        f"name={name!r}, parent={parent!r}, and Source exactly {SCRIPT_BOOTSTRAP_SOURCE!r}. "
+        "No other Source is allowed at creation. Then script_read the exact new path before replacing the bootstrap. "
+        "Do not use execute_luau to create Script-like objects or assign Source."
     )
 
 
@@ -4424,7 +4435,19 @@ def block_reason_for_call(name: str, args: dict[str, Any] | None) -> str | None:
             elif n == "script_read" and target_matches(bpath, extract_target(args)):
                 required_action = True
             elif n == "multi_edit":
+                # The current official MCP's missing normal-Script path is
+                # create-via-multi_edit. Keep that exact inert transaction.
                 if _benchmark_missing_script_bootstrap_multi_edit(args, bpath):
+                    required_action = True
+                else:
+                    return _benchmark_missing_script_message(bpath)
+            elif n == "create_instances":
+                # ModuleScript/LocalScript benchmark assets cannot be created
+                # through multi_edit because that path cannot select the class.
+                # create_instances is safe only for the exact proven-missing
+                # path and inert bootstrap; script_creation_policy_reason has
+                # already rejected arbitrary Source.
+                if _benchmark_missing_script_create_matches(args, bpath):
                     required_action = True
                 else:
                     return _benchmark_missing_script_message(bpath)
@@ -4817,8 +4840,8 @@ def on_tool_result(name: str, args: dict[str, Any] | None, response: dict[str, A
             created_path = str(missing_blocker.get("path") or "")
             state_update(lambda state: state.__setitem__("current_blocker", None))
             notes.append(
-                f"Benchmark bootstrap Script created at {created_path}. MANDATORY NEXT: script_read that exact path; "
-                "do not multi_edit until the authoritative bootstrap source is cached."
+                f"Benchmark bootstrap Script-like object created at {created_path}. MANDATORY NEXT: script_read that exact path; "
+                "do not edit Source until the authoritative bootstrap source is cached."
             )
 
     if n == "start_stop_play" and args.get("is_start") is False and not is_error:
@@ -6906,6 +6929,65 @@ def self_test_main() -> int:
         with _state_lock:
             STATE.clear()
             STATE.update(saved_state_6318)
+
+    # V6.3.25 regression: a proven-missing benchmark ModuleScript can be
+    # recovered with create_instances using the exact class/path/bootstrap,
+    # while arbitrary Source or wrong path remains rejected.
+    missing_module_target = "ServerScriptService.__QWEN_SCRIPT_BENCH__.SP07_A"
+    correct_module_create = {
+        "instances": [{
+            "className": "ModuleScript",
+            "name": "SP07_A",
+            "parent": "ServerScriptService.__QWEN_SCRIPT_BENCH__",
+            "properties": {"Source": SCRIPT_BOOTSTRAP_SOURCE},
+        }]
+    }
+    if not _benchmark_missing_script_create_matches(correct_module_create, missing_module_target):
+        failures.append("V6.3.25 exact benchmark ModuleScript bootstrap creation was not recognized")
+    wrong_module_create = {
+        "instances": [{
+            "className": "ModuleScript",
+            "name": "WrongModule",
+            "parent": "ServerScriptService.__QWEN_SCRIPT_BENCH__",
+            "properties": {"Source": SCRIPT_BOOTSTRAP_SOURCE},
+        }]
+    }
+    if _benchmark_missing_script_create_matches(wrong_module_create, missing_module_target):
+        failures.append("V6.3.25 wrong benchmark ModuleScript path incorrectly matched")
+    module_missing_state = new_state()
+    module_missing_state["studio_mode"] = "edit"
+    module_missing_state["qwen_decision_trace_gate"] = {
+        "last_at": time.time(),
+        "consumed": False,
+    }
+    module_missing_state["current_blocker"] = {
+        "classification": "benchmark_script_missing",
+        "path": missing_module_target,
+        "stage": "need_create_bootstrap",
+        "message": "missing module",
+    }
+    with _state_lock:
+        saved_state_6325 = copy.deepcopy(STATE)
+        STATE.clear()
+        STATE.update(copy.deepcopy(module_missing_state))
+    try:
+        module_create_reason = block_reason_for_call("create_instances", correct_module_create)
+        if module_create_reason:
+            failures.append(f"V6.3.25 exact missing ModuleScript create was blocked: {module_create_reason!r}")
+        bad_module_reason = block_reason_for_call("create_instances", {
+            "instances": [{
+                "className": "ModuleScript",
+                "name": "SP07_A",
+                "parent": "ServerScriptService.__QWEN_SCRIPT_BENCH__",
+                "properties": {"Source": "return {}"},
+            }]
+        })
+        if not bad_module_reason or "must be created with Source exactly" not in bad_module_reason:
+            failures.append(f"V6.3.25 arbitrary ModuleScript Source was not rejected: {bad_module_reason!r}")
+    finally:
+        with _state_lock:
+            STATE.clear()
+            STATE.update(saved_state_6325)
 
     # V6.3.20 regression: the current built-in Roblox MCP creates a missing
     # Script through multi_edit, so the controller must permit exactly the inert
