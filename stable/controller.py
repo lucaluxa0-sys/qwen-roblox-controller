@@ -38,8 +38,8 @@ import urllib.request
 from pathlib import Path
 from typing import Any
 
-APP_NAME = "Qwen Roblox Enforced Proxy V6"
-VERSION = "6.0.0"
+APP_NAME = "Qwen Roblox Enforced Proxy V6.1"
+VERSION = "6.1.0"
 
 LOCALAPPDATA = Path(os.environ.get("LOCALAPPDATA", str(Path.home())))
 STATE_DIR = LOCALAPPDATA / "QwenRobloxEnforcedProxy"
@@ -417,7 +417,10 @@ _CONTROLLER_HEALTH: dict[str, Any] = {
     "last_health_update": time.time(),
 }
 
-_SENSITIVE_KEY_RE = re.compile(r"(?:token|authorization|password|passwd|secret|api[_-]?key|cookie)", re.I)
+_SENSITIVE_KEY_RE = re.compile(
+    r"^(?:authorization|proxy_authorization|password|passwd|secret|client_secret|api[_-]?key|cookie|set_cookie|access_token|refresh_token|id_token|bearer_token|lm_studio_api_token)$",
+    re.I,
+)
 
 
 def _telemetry_sanitize(value: Any, depth: int = 0) -> Any:
@@ -1557,6 +1560,10 @@ def source_policy_defects(source: str) -> list[str]:
         defects.append("Accessory.RootPart is referenced even though it is not the verified accessory structure")
     if "accessory" in low and re.search(r"\.\s*primarypart\b", low):
         defects.append("Accessory.PrimaryPart is referenced instead of the verified Handle structure")
+    if re.search(r"\bIsA\s*\(\s*[\"\']HumanoidRootPart[\"\']\s*\)", source, re.I):
+        defects.append("HumanoidRootPart is an instance name, not a Roblox class; do not use IsA(\"HumanoidRootPart\")")
+    if "accessory" in low and re.search(r"\bhandle\s*\.\s*originalsize\s*\.\s*value\b", low):
+        defects.append("Accessory Handle.OriginalSize is indexed without first proving the child exists; use FindFirstChild and verify Vector3Value before .Value")
     return defects[:10]
 
 
@@ -2440,6 +2447,18 @@ def block_reason_for_call(name: str, args: dict[str, Any] | None) -> str | None:
     blocker = state.get("current_blocker")
     gate = state.get("gate")
     mode = state.get("studio_mode")
+
+    # V6.1 defensive reconciliation for persisted V6 states: a repaired static
+    # blocker must not veto the exact Play action required by a clean gate.
+    if (
+        isinstance(gate, dict) and gate.get("stage") == "need_playtest"
+        and isinstance(blocker, dict)
+        and blocker.get("classification") == "static_source_defect"
+        and blocker.get("stage") == "repair_applied"
+        and target_matches(blocker.get("path") or "", gate.get("target") or "")
+    ):
+        blocker = None
+
     repair_override = False
     required_action = False
 
@@ -2955,6 +2974,20 @@ def on_tool_result(name: str, args: dict[str, Any] | None, response: dict[str, A
                         else:
                             gate["stage"] = "need_playtest"
                             verification_note = "Edit reread recorded as authoritative current source and passed V6 static checks."
+
+            # V6.1 invariant: once the authoritative reread is clean and the
+            # gate advances to need_playtest, a stale static-source blocker for
+            # that same script must not survive. Otherwise the blocker forbids
+            # Play while the gate requires it, creating an impossible loop.
+            if isinstance(gate, dict) and gate.get("stage") == "need_playtest":
+                active = state.get("current_blocker")
+                if (
+                    isinstance(active, dict)
+                    and active.get("classification") == "static_source_defect"
+                    and target_matches(active.get("path") or "", actual)
+                    and not (raw_static_source_defects(actual_source) if actual_source else [])
+                ):
+                    state["current_blocker"] = None
         state_update(after_read)
         with _state_lock:
             gate = STATE.get("gate")
@@ -3773,6 +3806,23 @@ def self_test_main() -> int:
     if not reason or "execute_luau" not in reason:
         failures.append("execute_luau Source bypass was not rejected")
 
+    invalid_isa = """local function run(descendant)\n\tif descendant:IsA("HumanoidRootPart") then\n\t\tprint(descendant)\n\tend\nend"""
+    expect_reject("invalid HumanoidRootPart IsA", good, invalid_isa, "instance name")
+
+    unsafe_original_size = """local function flattenAccessories(character)\n\tfor _, descendant in ipairs(character:GetDescendants()) do\n\t\tif descendant:IsA("Accessory") then\n\t\t\tlocal handle = descendant.Handle\n\t\t\tif handle and handle.OriginalSize.Value then\n\t\t\t\tprint(handle.OriginalSize.Value)\n\t\t\tend\n\t\tend\n\tend\nend"""
+    expect_reject("unsafe accessory OriginalSize", good, unsafe_original_size, "FindFirstChild")
+
+    sanitized_meter = _telemetry_sanitize({
+        "estimated_tokens": 1234,
+        "window_tokens": 40000,
+        "exact_input_tokens": 999,
+        "access_token": "secret-value",
+    })
+    if sanitized_meter.get("estimated_tokens") != 1234 or sanitized_meter.get("window_tokens") != 40000 or sanitized_meter.get("exact_input_tokens") != 999:
+        failures.append(f"telemetry token metrics were incorrectly redacted: {sanitized_meter}")
+    if sanitized_meter.get("access_token") != "[REDACTED]":
+        failures.append("sensitive access_token was not redacted")
+
     if failures:
         telemetry_write_test_results({
             "suite": "controller_self_test",
@@ -3787,7 +3837,7 @@ def self_test_main() -> int:
             severity="critical",
             extra={"failures": failures},
         )
-        print("V6 SELF-TEST FAILED")
+        print("V6.1 SELF-TEST FAILED")
         for row in failures:
             print(" -", row)
         return 1
@@ -3798,7 +3848,7 @@ def self_test_main() -> int:
         "failure_count": 0,
         "failures": [],
     })
-    print("V6 SELF-TEST PASSED")
+    print("V6.1 SELF-TEST PASSED")
     print(" - missing end rejected")
     print(" - unclosed delimiters rejected")
     print(" - common non-Luau operators rejected")
@@ -3829,7 +3879,7 @@ def telemetry_smoke_test_main() -> int:
         for row in problems:
             print(" -", row)
         return 1
-    print("V6 TELEMETRY SMOKE TEST PASSED")
+    print("V6.1 TELEMETRY SMOKE TEST PASSED")
     print(f" - telemetry directory: {TELEMETRY_DIR}")
     print(f" - status: {TELEMETRY_STATUS_FILE.name}")
     print(f" - health: {TELEMETRY_HEALTH_FILE.name}")
