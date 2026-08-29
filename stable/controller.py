@@ -39,8 +39,8 @@ import urllib.request
 from pathlib import Path
 from typing import Any
 
-APP_NAME = "Qwen Roblox Enforced Proxy V6.3"
-VERSION = "6.3.0"
+APP_NAME = "Qwen Roblox Enforced Proxy V6.3.1"
+VERSION = "6.3.1"
 
 LOCALAPPDATA = Path(os.environ.get("LOCALAPPDATA", str(Path.home())))
 STATE_DIR = LOCALAPPDATA / "QwenRobloxEnforcedProxy"
@@ -2892,7 +2892,7 @@ def block_reason_for_call(name: str, args: dict[str, Any] | None) -> str | None:
                 required_action = True
             elif n == "start_stop_play" and args.get("is_start") is False:
                 required_action = True
-            elif n in {"supervisor_status", "supervisor_resume", "get_studio_state"}:
+            elif n in {"supervisor_status", "supervisor_resume", "get_studio_state", "list_roblox_studios"}:
                 required_action = True
             else:
                 return (
@@ -2914,7 +2914,7 @@ def block_reason_for_call(name: str, args: dict[str, Any] | None) -> str | None:
                 required_action = True
             elif n == "start_stop_play" and args.get("is_start") is False:
                 required_action = True
-            elif n in {"supervisor_status", "supervisor_resume", "get_studio_state"}:
+            elif n in {"supervisor_status", "supervisor_resume", "get_studio_state", "list_roblox_studios"}:
                 required_action = True
             else:
                 return (
@@ -2925,7 +2925,7 @@ def block_reason_for_call(name: str, args: dict[str, Any] | None) -> str | None:
         elif stage == "need_playtest":
             if n == "start_stop_play" and args.get("is_start") is True:
                 required_action = True
-            elif n in {"supervisor_status", "supervisor_resume", "get_studio_state"}:
+            elif n in {"supervisor_status", "supervisor_resume", "get_studio_state", "list_roblox_studios"}:
                 required_action = True
             else:
                 return (
@@ -2936,7 +2936,7 @@ def block_reason_for_call(name: str, args: dict[str, Any] | None) -> str | None:
         elif stage == "need_output":
             if n in OUTPUT_TOOLS:
                 required_action = True
-            elif n in {"supervisor_status", "supervisor_resume", "get_studio_state"}:
+            elif n in {"supervisor_status", "supervisor_resume", "get_studio_state", "list_roblox_studios"}:
                 required_action = True
             else:
                 return (
@@ -2948,7 +2948,7 @@ def block_reason_for_call(name: str, args: dict[str, Any] | None) -> str | None:
             req = gate.get("runtime_requirements") or {}
             if n in (READ_EVIDENCE_TOOLS - {"script_read", "read_script_range", "get_studio_state"}):
                 required_action = True
-            elif n in {"supervisor_status", "supervisor_resume", "get_studio_state"}:
+            elif n in {"supervisor_status", "supervisor_resume", "get_studio_state", "list_roblox_studios"}:
                 required_action = True
             else:
                 return (
