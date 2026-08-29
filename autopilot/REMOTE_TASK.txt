@@ -1,25 +1,28 @@
-Task-Instance: run6-postcomplete-runtime-gate-finish-20260829T0907Z
+Task-Instance: run6-postcomplete-output-retry-20260829T0910Z
 
-RUN6 REMAINS CONTROLLER-VERIFIED COMPLETE: 24/24 PASS, SP01+SP02 complete, batch marker accepted.
+RUN6 REMAINS CONTROLLER-VERIFIED COMPLETE: 24/24 PASS, SP01+SP02 complete, starter batch marker accepted.
 
-The accidental post-completion SP02 edit has now been reread and Play is already running because the controller correctly required runtime verification.
+CURRENT STATE:
+- Play is already running.
+- Controller gate is need_output for:
+  ServerScriptService.__QWEN_SCRIPT_BENCH__.SP02_ScriptingTests
+- A previous get_console_output call errored, then list_roblox_studios succeeded.
 
-ONLY RECOVERY ACTIONS:
-1. Call get_console_output exactly once.
-2. If no relevant runtime error is reported for:
-   ServerScriptService.__QWEN_SCRIPT_BENCH__.SP02_ScriptingTests
-   stop Play exactly once.
-3. Confirm the controller gate is clear only if needed.
-4. Emit exactly:
+ONLY RECOVERY:
+1. Retry get_console_output on the currently connected Studio exactly once.
+2. If it succeeds with no relevant runtime error, stop Play exactly once.
+3. If the controller gate is then clear, emit exactly:
    [TASK_COMPLETE]
-5. Stop immediately.
+4. Stop.
 
-ABSOLUTELY FORBIDDEN:
+If get_console_output errors again, do NOT mutate anything and do NOT start another Play session. Stop and leave the gate for supervisor intervention.
+
+FORBIDDEN:
+- script_read while Play is running
 - multi_edit
 - execute_luau
 - create_instances
 - any source mutation
 - benchmark reporting
-- rerunning SP01/SP02
-- starting another Play session
-- any cleanup mutation in this task
+- SP01/SP02 reruns
+- cleanup mutation
