@@ -1,277 +1,267 @@
-Task-Instance: scripting-full-run6-sp04-functions-closures-20260829T0924Z
+Task-Instance: scripting-full-run6-sp05-tables-data-20260829T0931Z
 Benchmark-Run-ID: scripting-s001-s024-structured-run6-20260829T0806Z
 
 CONTINUE THE SAME CONTROLLER-VERIFIED SCRIPTING RUN.
-Verified state required before starting: S001-S036 PASS and SP01-SP03 complete.
+Required verified state: S001-S052 PASS and SP01-SP04 complete.
 Live controller: 6.3.22 or newer.
 
-ONLY GOAL: prove SP04 functions_closures, S037-S052.
+ONLY GOAL: prove SP05 tables_data, S053-S068.
 
 TARGET:
-ServerScriptService.__QWEN_SCRIPT_BENCH__.SP04_ScriptingTests
+ServerScriptService.__QWEN_SCRIPT_BENCH__.SP05_ScriptingTests
 
 MANDATORY FLOW:
-1. Work only on SP04; never touch SP01-SP03 and do not call batch_complete.
-2. In Edit mode, script_read the exact target.
-3. If confirmed missing, create only through multi_edit with exactly one edit pair: old_string="" -> new_string="-- QWEN_CONTROLLER_SCRIPT_BOOTSTRAP", replace_all=false.
+1. Work only on SP05. Do not touch earlier packs and do not call batch_complete.
+2. In Edit mode, script_read the exact target. If Studio targeting errors, list_roblox_studios once and retry the same read.
+3. If target is confirmed missing, create it only with one multi_edit pair: old_string="" -> new_string="-- QWEN_CONTROLLER_SCRIPT_BOOTSTRAP", replace_all=false.
 4. script_read exact target after bootstrap creation.
-5. Replace ONLY the exact bootstrap string with EXACTLY the HARNESS below using one multi_edit pair and replace_all=false. Do not improvise or shorten it.
+5. Replace ONLY the exact bootstrap with EXACTLY the HARNESS below using one multi_edit pair, replace_all=false. Do not improvise.
 6. Immediately script_read exact target.
 7. Start Play once.
-8. get_console_output once. If a Studio-target error occurs, list_roblox_studios once and retry Output once.
-9. Verify S037-S052 individually from Output.
-10. Stop Play.
-11. Call supervisor_benchmark_record using the SAME Benchmark-Run-ID with exactly S037-S052 and pack_complete=["SP04"]. PASS only with evidence.
-12. Require controller-verified tests_seen=52, pass=52, partial=0, fail=0, and SP04 marker.
-13. Emit [TASK_COMPLETE] only after the record is accepted and controller gate is clear.
+8. get_console_output once. On a Studio-target error, list_roblox_studios once and retry Output once.
+9. Verify S053-S068 individually from Output; then stop Play.
+10. supervisor_benchmark_record SAME run id with exactly S053-S068 and pack_complete=["SP05"].
+11. Require controller-verified tests_seen=68, pass=68, partial=0, fail=0, SP05 marker, gate clear.
+12. Emit [TASK_COMPLETE] and stop.
 
-If a mutation is blocked, obey the exact controller defect and never repeat an identical failed proposal. Do not use execute_luau to create Scripts or assign Source. Do not perform pathless whole-tree searches.
+Never retry an identical blocked mutation without new evidence. Do not use execute_luau to create Scripts or assign Source. No pathless whole-tree search.
 
 HARNESS_START
 local function runTest(id, fn)
 	local ok, err = pcall(fn)
 	if ok then
-		print("[SP04] " .. id .. " PASS")
+		print("[SP05] " .. id .. " PASS")
 	else
-		warn("[SP04] " .. id .. " FAIL: " .. tostring(err))
+		warn("[SP05] " .. id .. " FAIL: " .. tostring(err))
 	end
 end
 
-runTest("S037", function()
-	local function calculate(a, b)
-		return a + b, a * b
-	end
-	local sum, product = calculate(3, 4)
-	assert(sum == 7)
-	assert(product == 12)
+runTest("S053", function()
+	local values = {10, 20, 30}
+	values[2] = 25
+	values[#values + 1] = 40
+	assert(#values == 4)
+	assert(values[1] == 10)
+	assert(values[2] == 25)
+	assert(values[4] == 40)
 end)
 
-runTest("S038", function()
-	local function label(value, suffix)
-		if suffix == nil then
-			suffix = "!"
-		end
-		assert(type(value) == "string")
-		assert(type(suffix) == "string")
-		return value .. suffix
-	end
-	assert(label("ready") == "ready!")
-	assert(label("ready", "?") == "ready?")
+runTest("S054", function()
+	local config = {
+		speed = 16,
+		enabled = true,
+		name = "benchmark",
+	}
+	assert(config.speed == 16)
+	assert(config["enabled"] == true)
+	assert(config.missing == nil)
 end)
 
-runTest("S039", function()
-	local object = {value = 10}
-	function object:add(amount)
-		self.value += amount
-		return self.value
-	end
-	assert(object:add(2) == 12)
-	assert(object.add(object, 3) == 15)
+runTest("S055", function()
+	local source = {nested = {value = 1}}
+	local shallow = {nested = source.nested}
+	shallow.nested.value = 2
+	assert(source.nested.value == 2)
+
+	local deep = {nested = {value = source.nested.value}}
+	deep.nested.value = 3
+	assert(source.nested.value == 2)
+	assert(deep.nested.value == 3)
 end)
 
-runTest("S040", function()
-	local object = {value = 5}
-	function object:multiply(amount)
-		return self.value * amount
-	end
-	local repaired = object.multiply(object, 4)
-	assert(repaired == 20)
-	assert(object:multiply(2) == 10)
-end)
-
-runTest("S041", function()
-	local function makeCounter()
-		local count = 0
-		return function()
-			count += 1
-			return count
-		end
-	end
-	local counter = makeCounter()
-	assert(counter() == 1)
-	assert(counter() == 2)
-end)
-
-runTest("S042", function()
-	local broken = {}
-	local shared = 0
-	for i = 1, 3 do
-		shared = i
-		broken[i] = function()
-			return shared
-		end
-	end
-	assert(broken[1]() == 3)
-	assert(broken[2]() == 3)
-
-	local fixed = {}
-	for i = 1, 3 do
-		local captured = i
-		fixed[i] = function()
-			return captured
-		end
-	end
-	assert(fixed[1]() == 1)
-	assert(fixed[2]() == 2)
-	assert(fixed[3]() == 3)
-end)
-
-runTest("S043", function()
-	local function makeAccumulator(startValue)
-		local value = startValue
-		return function(amount)
-			value += amount
+runTest("S056", function()
+	local function deepCopy(value, depth)
+		if type(value) ~= "table" then
 			return value
 		end
-	end
-	local first = makeAccumulator(0)
-	local second = makeAccumulator(100)
-	assert(first(5) == 5)
-	assert(first(2) == 7)
-	assert(second(1) == 101)
-	assert(second(4) == 105)
-end)
-
-runTest("S044", function()
-	local function invoke(callback, value)
-		local ok, result = pcall(callback, value)
-		if not ok then
-			return false, tostring(result)
-		end
-		return true, result
-	end
-	local okGood, resultGood = invoke(function(value)
-		return value * 2
-	end, 4)
-	assert(okGood == true)
-	assert(resultGood == 8)
-	local okBad, resultBad = invoke(function()
-		error("expected callback failure")
-	end, 0)
-	assert(okBad == false)
-	assert(type(resultBad) == "string")
-end)
-
-runTest("S045", function()
-	local function sumNumbers(...)
-		local values = {...}
-		local total = 0
-		for _, value in ipairs(values) do
-			assert(type(value) == "number")
-			total += value
-		end
-		return total, #values
-	end
-	local total, count = sumNumbers(1, 2, 3, 4)
-	assert(total == 10)
-	assert(count == 4)
-end)
-
-runTest("S046", function()
-	local function scaled(value, multiplier)
-		return value * multiplier
-	end
-	local first = scaled(3, 2)
-	local second = scaled(5, 2)
-	assert(first == 6)
-	assert(second == 10)
-end)
-
-runTest("S047", function()
-	local function factorial(value)
-		if value <= 1 then
-			return 1
-		end
-		return value * factorial(value - 1)
-	end
-	assert(factorial(1) == 1)
-	assert(factorial(5) == 120)
-end)
-
-runTest("S048", function()
-	local function iterativeFactorial(value)
-		local result = 1
-		for i = 2, value do
-			result *= i
+		assert(depth < 5)
+		local result = {}
+		for key, child in pairs(value) do
+			result[deepCopy(key, depth + 1)] = deepCopy(child, depth + 1)
 		end
 		return result
 	end
-	assert(iterativeFactorial(1) == 1)
-	assert(iterativeFactorial(6) == 720)
+	local original = {a = 1, nested = {b = 2}}
+	local copied = deepCopy(original, 0)
+	copied.nested.b = 9
+	assert(original.nested.b == 2)
+	assert(copied.nested.b == 9)
 end)
 
-runTest("S049", function()
-	local function double(value)
-		return value * 2
+runTest("S057", function()
+	local defaults = {speed = 16, jump = 50, enabled = true}
+	local overrides = {speed = 24, enabled = false}
+	local merged = {}
+	for key, value in pairs(defaults) do
+		merged[key] = value
 	end
-	local function addDouble(a, b)
-		return double(a) + double(b)
+	for key, value in pairs(overrides) do
+		merged[key] = value
 	end
-	assert(addDouble(2, 3) == 10)
+	assert(merged.speed == 24)
+	assert(merged.jump == 50)
+	assert(merged.enabled == false)
+	assert(defaults.speed == 16)
+	assert(defaults.enabled == true)
 end)
 
-runTest("S050", function()
-	local API = {}
-	function API.add(a, b)
-		assert(type(a) == "number")
-		assert(type(b) == "number")
-		return a + b
-	end
-	function API.isPositive(value)
-		return value > 0
-	end
-	assert(API.add(2, 5) == 7)
-	assert(API.isPositive(1) == true)
-	assert(API.isPositive(-1) == false)
-end)
-
-runTest("S051", function()
-	local name = "__QWEN_SP04_IDEMPOTENT__"
-	local function ensureFolder()
-		local existing = script:FindFirstChild(name)
-		if existing then
-			return existing
-		end
-		local folder = Instance.new("Folder")
-		folder.Name = name
-		folder.Parent = script
-		return folder
-	end
-	local first = ensureFolder()
-	local second = ensureFolder()
-	assert(first == second)
-	local count = 0
-	for _, child in ipairs(script:GetChildren()) do
-		if child.Name == name then
-			count += 1
+runTest("S058", function()
+	local values = {1, 2, 3, 4, 5, 6}
+	for index = #values, 1, -1 do
+		if values[index] % 2 == 0 then
+			table.remove(values, index)
 		end
 	end
-	assert(count == 1)
-	first:Destroy()
+	assert(#values == 3)
+	assert(values[1] == 1)
+	assert(values[2] == 3)
+	assert(values[3] == 5)
 end)
 
-runTest("S052", function()
-	local shared = 0
-	local function brokenIncrement()
-		shared += 1
-		return shared
-	end
-	assert(brokenIncrement() == 1)
-	assert(brokenIncrement() == 2)
+runTest("S059", function()
+	local values = {"a", "c"}
+	table.insert(values, 2, "b")
+	assert(values[2] == "b")
+	local removed = table.remove(values, 2)
+	assert(removed == "b")
+	assert(#values == 2)
+	assert(values[2] == "c")
+end)
 
-	local function makeIndependent()
-		local value = 0
-		return function()
-			value += 1
-			return value
+runTest("S060", function()
+	local values = {"alpha", "beta", "gamma"}
+	assert(table.find(values, "beta") == 2)
+	assert(table.find(values, "missing") == nil)
+end)
+
+runTest("S061", function()
+	local values = {
+		{id = "b", score = 10},
+		{id = "a", score = 10},
+		{id = "c", score = 5},
+	}
+	table.sort(values, function(left, right)
+		if left.score == right.score then
+			return left.id < right.id
 		end
-	end
-	local first = makeIndependent()
-	local second = makeIndependent()
-	assert(first() == 1)
-	assert(first() == 2)
-	assert(second() == 1)
+		return left.score > right.score
+	end)
+	assert(values[1].id == "a")
+	assert(values[2].id == "b")
+	assert(values[3].id == "c")
 end)
 
-print("[SP04] COMPLETE")
+runTest("S062", function()
+	local inventory = {
+		item_1001 = {displayName = "Potion", count = 2},
+		item_1002 = {displayName = "Potion", count = 5},
+	}
+	assert(inventory.item_1001.count == 2)
+	assert(inventory.item_1002.count == 5)
+	assert(inventory.item_1001 ~= inventory.item_1002)
+end)
+
+runTest("S063", function()
+	local HttpService = game:GetService("HttpService")
+	local safeData = {
+		id = "item_1001",
+		count = 2,
+		enabled = true,
+		tags = {"healing", "small"},
+	}
+	local encoded = HttpService:JSONEncode(safeData)
+	assert(type(encoded) == "string")
+	assert(#encoded > 0)
+end)
+
+runTest("S064", function()
+	local function hasCycle(value, visiting, visited)
+		if type(value) ~= "table" then
+			return false
+		end
+		if visiting[value] then
+			return true
+		end
+		if visited[value] then
+			return false
+		end
+		visiting[value] = true
+		for key, child in pairs(value) do
+			if hasCycle(key, visiting, visited) then
+				return true
+			end
+			if hasCycle(child, visiting, visited) then
+				return true
+			end
+		end
+		visiting[value] = nil
+		visited[value] = true
+		return false
+	end
+	local cyclic = {}
+	cyclic.self = cyclic
+	assert(hasCycle(cyclic, {}, {}) == true)
+	assert(hasCycle({a = {b = 2}}, {}, {}) == false)
+end)
+
+runTest("S065", function()
+	local metadata = setmetatable({}, {__mode = "k"})
+	local owner = {}
+	metadata[owner] = {connectionCount = 1}
+	assert(metadata[owner].connectionCount == 1)
+	local meta = getmetatable(metadata)
+	assert(meta ~= nil)
+	assert(meta.__mode == "k")
+	metadata[owner] = nil
+	assert(metadata[owner] == nil)
+end)
+
+runTest("S066", function()
+	local function normalize(input)
+		local count = tonumber(input.count) or 0
+		if count < 0 then
+			count = 0
+		end
+		return {
+			id = tostring(input.id or ""),
+			count = count,
+			enabled = input.enabled == true,
+		}
+	end
+	local result = normalize({id = 42, count = "-3", enabled = 1})
+	assert(result.id == "42")
+	assert(result.count == 0)
+	assert(result.enabled == false)
+end)
+
+runTest("S067", function()
+	local function sameItem(left, right)
+		return left.id == right.id and left.count == right.count
+	end
+	local first = {id = "item_1", count = 3}
+	local second = {id = "item_1", count = 3}
+	assert(first ~= second)
+	assert(sameItem(first, second) == true)
+	second.count = 4
+	assert(sameItem(first, second) == false)
+end)
+
+runTest("S068", function()
+	local sharedDefaults = {items = {}}
+	local brokenA = {items = sharedDefaults.items}
+	local brokenB = {items = sharedDefaults.items}
+	table.insert(brokenA.items, "shared")
+	assert(brokenB.items[1] == "shared")
+
+	local function newState()
+		return {items = {}}
+	end
+	local fixedA = newState()
+	local fixedB = newState()
+	table.insert(fixedA.items, "private")
+	assert(fixedA.items[1] == "private")
+	assert(#fixedB.items == 0)
+end)
+
+print("[SP05] COMPLETE")
 HARNESS_END
