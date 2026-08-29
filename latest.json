@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
-  "version": "6.3.4",
+  "version": "6.3.5",
   "channel": "stable",
   "controller_path": "stable/controller.py",
-  "release_path": "releases/6.3.4/controller.py",
-  "sha256": "7b73d67e6a20c9b39c740df8326d1e6f7e015c16bb0e0bf9ebffc5cb41d40e41",
-  "published_at": "2026-08-29T05:31:15Z",
-  "notes": "Automatically detects the official Roblox MCP 'Client proxy is out of date, restart to update' failure, performs up to two bounded controller/bridge restarts while preserving state, stops repeated Qwen Studio-tool churn if the Studio-side proxy still requires a safe Studio restart, and classifies that wait as MCP/environment rather than a controller deadlock."
+  "release_path": "releases/6.3.5/controller.py",
+  "sha256": "07ba38100b55da3d199d948db2141a24bc67ad6b1653aa564f336bb8211e395a",
+  "published_at": "2026-08-29T05:45:41Z",
+  "notes": "Allows list_roblox_studios during static/syntax source-repair recovery, gives Qwen an explicit refresh-studio_id -> script_read -> narrow repair path after failed source/state reads, and stops misclassifying repeated policy/tool-recovery loops as controller deadlocks when the repair path remains satisfiable."
 }
