@@ -1,11 +1,11 @@
 {
   "schema_version": 1,
-  "version": "6.3.26",
+  "version": "6.3.27",
   "channel": "stable",
-  "controller_path": "releases/6.3.26/controller.py",
-  "release_path": "releases/6.3.26/controller.py",
-  "sha256": "40bd32cb25b252ee50ae1cdca3ec876e081ae1e57c6add30df49416c66902fcd",
-  "published_at": "2026-08-29T11:05:17Z",
-  "notes": "Protects scripting benchmark run integrity: canonical scripting run IDs, S001-S280 bounds, immutable prior result status, and heartbeat preference for canonical scripting runs over accidental object/path run IDs.",
-  "url": "https://raw.githubusercontent.com/lucaluxa0-sys/qwen-roblox-controller/main/releases/6.3.26/controller.py"
+  "controller_path": "releases/6.3.27/controller.py",
+  "release_path": "releases/6.3.27/controller.py",
+  "sha256": "433c114352252ce5ffc4e3ce6a8631a95f5399340bd9fe976a7460d5caae4d3d",
+  "published_at": "2026-08-29T11:15:40Z",
+  "notes": "Adds explicit intended_script_class to structured Qwen decision traces and enforces exact Script/LocalScript/ModuleScript class during proven-missing benchmark creation, preventing multi_edit from silently creating the wrong class.",
+  "url": "https://raw.githubusercontent.com/lucaluxa0-sys/qwen-roblox-controller/main/releases/6.3.27/controller.py"
 }
