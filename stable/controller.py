@@ -39,8 +39,8 @@ import urllib.request
 from pathlib import Path
 from typing import Any
 
-APP_NAME = "Qwen Roblox Enforced Proxy V6.3.26"
-VERSION = "6.3.26"
+APP_NAME = "Qwen Roblox Enforced Proxy V6.3.27"
+VERSION = "6.3.27"
 
 LOCALAPPDATA = Path(os.environ.get("LOCALAPPDATA", str(Path.home())))
 STATE_DIR = LOCALAPPDATA / "QwenRobloxEnforcedProxy"
@@ -1061,6 +1061,7 @@ def _public_qwen_decision_row(row: dict[str, Any]) -> dict[str, Any]:
         "next_action": _public_safe_string(row.get("next_action"), 500),
         "confidence": _public_safe_string(row.get("confidence"), 20),
         "blocker": _public_safe_string(row.get("blocker"), 500),
+        "intended_script_class": _public_safe_string(row.get("intended_script_class"), 30),
         "controller_state": {
             "studio_mode": _public_safe_string(state.get("studio_mode"), 40),
             "play_session": state.get("play_session"),
@@ -2516,7 +2517,7 @@ def _script_creation_rows(value: Any) -> list[tuple[str, str | None]]:
     return rows
 
 
-def _benchmark_missing_script_create_matches(args: dict[str, Any] | None, target: str) -> bool:
+def _benchmark_missing_script_create_matches(args: dict[str, Any] | None, target: str, intended_class: str | None = None) -> bool:
     """True only when create_instances contains the exact missing benchmark Script-like bootstrap.
 
     A missing benchmark path can intentionally be a Script, LocalScript, or
@@ -2564,6 +2565,7 @@ def _benchmark_missing_script_create_matches(args: dict[str, Any] | None, target
         if (
             isinstance(cls, str)
             and cls.lower() in SCRIPT_CLASSES
+            and (not intended_class or cls.lower() == intended_class.lower())
             and str(name or "").lower() == expected_name.lower()
             and canonical_target(str(parent or "")) == canonical_target(expected_parent)
             and normalize_source(str(source or "")) == SCRIPT_BOOTSTRAP_SOURCE
@@ -4460,21 +4462,33 @@ def block_reason_for_call(name: str, args: dict[str, Any] | None) -> str | None:
             elif n == "script_read" and target_matches(bpath, extract_target(args)):
                 required_action = True
             elif n == "multi_edit":
-                # The current official MCP's missing normal-Script path is
-                # create-via-multi_edit. Keep that exact inert transaction.
+                # V6.3.27: when the fresh decision trace declares a class,
+                # missing-path creation may not silently choose a different
+                # script-like class. multi_edit's create path is only suitable
+                # for a normal Script.
+                trace_gate = state.get("qwen_decision_trace_gate") or {}
+                intended_class = str(trace_gate.get("intended_script_class") or "").strip()
+                if intended_class and intended_class != "Script":
+                    return (
+                        f"Blocked: the fresh decision trace declares intended_script_class={intended_class!r} for {bpath}. "
+                        "multi_edit missing-path creation cannot select that class. Use create_instances with the exact declared class, "
+                        f"name/parent matching the proven-missing path, and Source exactly {SCRIPT_BOOTSTRAP_SOURCE!r}."
+                    )
                 if _benchmark_missing_script_bootstrap_multi_edit(args, bpath):
                     required_action = True
                 else:
                     return _benchmark_missing_script_message(bpath)
             elif n == "create_instances":
-                # ModuleScript/LocalScript benchmark assets cannot be created
-                # through multi_edit because that path cannot select the class.
-                # create_instances is safe only for the exact proven-missing
-                # path and inert bootstrap; script_creation_policy_reason has
-                # already rejected arbitrary Source.
-                if _benchmark_missing_script_create_matches(args, bpath):
+                trace_gate = state.get("qwen_decision_trace_gate") or {}
+                intended_class = str(trace_gate.get("intended_script_class") or "").strip()
+                if _benchmark_missing_script_create_matches(args, bpath, intended_class or None):
                     required_action = True
                 else:
+                    if intended_class:
+                        return (
+                            f"Blocked: benchmark creation must match intended_script_class={intended_class!r}, exact path {bpath}, "
+                            f"and Source exactly {SCRIPT_BOOTSTRAP_SOURCE!r}."
+                        )
                     return _benchmark_missing_script_message(bpath)
             else:
                 return _benchmark_missing_script_message(bpath)
@@ -5308,6 +5322,7 @@ SUPERVISOR_DECISION_TRACE_TOOL = {
             "next_action": {"type": "string"},
             "confidence": {"type": "string", "enum": ["low", "medium", "high"]},
             "blocker": {"type": "string"},
+            "intended_script_class": {"type": "string", "enum": ["Script", "LocalScript", "ModuleScript"], "description": "When the next meaningful action creates a missing script-like benchmark object, declare its exact intended class so the controller can prevent wrong-class creation."},
         },
         "additionalProperties": False,
     },
@@ -5330,6 +5345,10 @@ def _validate_qwen_decision_trace(args: dict[str, Any]) -> tuple[dict[str, Any] 
     if confidence not in {"low", "medium", "high"}:
         return None, "confidence must be low, medium, or high."
 
+    intended_script_class = str(raw.get("intended_script_class") or "").strip()
+    if intended_script_class and intended_script_class not in {"Script", "LocalScript", "ModuleScript"}:
+        return None, "intended_script_class must be Script, LocalScript, or ModuleScript."
+
     evidence_raw = raw.get("evidence")
     if evidence_raw is None:
         evidence_raw = []
@@ -5348,6 +5367,7 @@ def _validate_qwen_decision_trace(args: dict[str, Any]) -> tuple[dict[str, Any] 
         "next_action": clean(next_action, 500),
         "confidence": confidence,
         "blocker": clean(raw.get("blocker"), 500),
+        "intended_script_class": intended_script_class,
     }
     return payload, None
 
@@ -5391,6 +5411,7 @@ def _record_qwen_decision_trace(args: dict[str, Any]) -> tuple[dict[str, Any] | 
         gate["decision"] = payload.get("decision", "")
         gate["next_action"] = payload.get("next_action", "")
         gate["confidence"] = payload.get("confidence", "")
+        gate["intended_script_class"] = payload.get("intended_script_class", "")
         gate["recorded_mutation_epoch"] = int(state_row.get("mutation_epoch", 0) or 0)
         gate["recorded_play_session"] = int(state_row.get("play_session", 0) or 0)
     state_update(arm_trace_gate)
@@ -6918,6 +6939,75 @@ def self_test_main() -> int:
     latest_run, latest_events = _latest_verified_benchmark_events(fake_rows)
     if latest_run != "new-run" or latest_events != ["[BENCH:S013:PASS]"]:
         failures.append(f"V6.3.17 benchmark run scoping failed: {latest_run!r} {latest_events!r}")
+
+    # V6.3.27 regression: a fresh decision trace can declare the exact
+    # script-like class for a missing benchmark object. Wrong-class creation
+    # must be rejected before Roblox MCP sees it.
+    valid_class_trace_6327, valid_class_reason_6327 = _validate_qwen_decision_trace({
+        "goal": "Create module",
+        "decision": "Create exact ModuleScript bootstrap",
+        "next_action": "create_instances",
+        "confidence": "high",
+        "intended_script_class": "ModuleScript",
+    })
+    if valid_class_reason_6327 or not valid_class_trace_6327 or valid_class_trace_6327.get("intended_script_class") != "ModuleScript":
+        failures.append(f"V6.3.27 valid intended script class trace rejected: {valid_class_reason_6327!r} {valid_class_trace_6327!r}")
+
+    class_target_6327 = "ServerScriptService.__QWEN_SCRIPT_BENCH__.SP07_B"
+    class_state_6327 = new_state()
+    class_state_6327["studio_mode"] = "edit"
+    class_state_6327["current_blocker"] = {
+        "classification": "benchmark_script_missing",
+        "path": class_target_6327,
+        "stage": "need_create_bootstrap",
+        "message": "missing",
+    }
+    class_state_6327["qwen_decision_trace_gate"] = {
+        "last_at": time.time(),
+        "consumed": False,
+        "intended_script_class": "ModuleScript",
+    }
+    with _state_lock:
+        saved_state_6327 = copy.deepcopy(STATE)
+        STATE.clear()
+        STATE.update(copy.deepcopy(class_state_6327))
+    try:
+        wrong_class_edit_6327 = {
+            "file_path": class_target_6327,
+            "edits": [{"old_string": "", "new_string": SCRIPT_BOOTSTRAP_SOURCE, "replace_all": False}],
+            "datamodel_type": "Edit",
+        }
+        wrong_class_reason_6327 = block_reason_for_call("multi_edit", wrong_class_edit_6327)
+        if not wrong_class_reason_6327 or "intended_script_class='ModuleScript'" not in wrong_class_reason_6327:
+            failures.append(f"V6.3.27 ModuleScript declaration did not block multi_edit Script creation: {wrong_class_reason_6327!r}")
+
+        correct_class_create_6327 = {
+            "instances": [{
+                "className": "ModuleScript",
+                "name": "SP07_B",
+                "parent": "ServerScriptService.__QWEN_SCRIPT_BENCH__",
+                "properties": {"Source": SCRIPT_BOOTSTRAP_SOURCE},
+            }]
+        }
+        correct_class_reason_6327 = block_reason_for_call("create_instances", correct_class_create_6327)
+        if correct_class_reason_6327:
+            failures.append(f"V6.3.27 exact declared ModuleScript creation was blocked: {correct_class_reason_6327!r}")
+
+        wrong_class_create_6327 = {
+            "instances": [{
+                "className": "Script",
+                "name": "SP07_B",
+                "parent": "ServerScriptService.__QWEN_SCRIPT_BENCH__",
+                "properties": {"Source": SCRIPT_BOOTSTRAP_SOURCE},
+            }]
+        }
+        wrong_create_reason_6327 = block_reason_for_call("create_instances", wrong_class_create_6327)
+        if not wrong_create_reason_6327 or "intended_script_class='ModuleScript'" not in wrong_create_reason_6327:
+            failures.append(f"V6.3.27 wrong create_instances class was not rejected: {wrong_create_reason_6327!r}")
+    finally:
+        with _state_lock:
+            STATE.clear()
+            STATE.update(saved_state_6327)
 
     # V6.3.26 regression: benchmark run IDs are canonical scripting-run IDs,
     # accidental object/path names cannot displace the real certification run,
