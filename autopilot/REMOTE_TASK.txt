@@ -1,60 +1,22 @@
-Task-Instance: scripting-full-run6-sp07-resume-with-decision-trace-20260829T1036Z
-Benchmark-Run-ID: scripting-s001-s024-structured-run6-20260829T0806Z
-Reserved-Full-Batch-ID: scripting-s001-s280-full-run6-20260829T1026Z
+Task-Instance: hold-sp07-for-controller-6.3.24-20260829T1041Z
 
-CONTINUE THE SAME CONTROLLER-VERIFIED RUN. DO NOT START A NEW BENCHMARK RUN.
-S001-S080 and SP01-SP06 are already controller-verified PASS under the Benchmark-Run-ID above.
-The Reserved-Full-Batch-ID is ONLY for the eventual batch_complete marker after S001-S280 and SP01-SP21 are all complete; it is NOT the run_id.
+TEMPORARY SAFETY HOLD.
 
-Live controller must be 6.3.23 or newer.
+Controller 6.3.24 is being promoted to enforce supervisor_decision_trace before mutations, Play starts, and benchmark commits.
 
-CURRENT VERIFIED/OBSERVED STATE
-- SP07 target Script exists at ServerScriptService.__QWEN_SCRIPT_BENCH__.SP07_ScriptingTests.
-- Its last source write was authoritatively reread.
-- It was playtested and the last Output check had no relevant runtime error.
-- Controller gate is currently clear.
-- Aggregate benchmark remains tests_seen=80, pass=80, partial=0, fail=0; SP07 has NOT been recorded yet.
-- Studio may currently be in Play mode.
+Preserve current SP07 evidence and artifacts exactly as they are.
+DO NOT call Roblox Studio tools.
+DO NOT mutate anything.
+DO NOT start Play.
+DO NOT call supervisor_benchmark_record.
 
-QWEN DECISION TRACE
-Use supervisor_decision_trace for concise operational summaries, not hidden chain-of-thought.
-Call it:
-1. now, before resuming SP07;
-2. before any meaningful source mutation or Play verification;
-3. before supervisor_benchmark_record;
-4. after an error if the strategy changes.
-Keep each trace short: goal, direct evidence, decision, expected result, next action, confidence.
+Record one supervisor_decision_trace with:
+- goal: hold SP07 for 6.3.24 activation
+- decision: stop without changing Studio
+- next_action: await fresh SP07 continuation task
+- confidence: high
 
-ONLY GOAL: prove SP07 modules S081-S094.
+Then emit exactly:
+[TASK_COMPLETE]
 
-REQUIRED OBJECTIVES
-S081 table API module + require.
-S082 function-returning module + correct call.
-S083 one-way two-module dependency.
-S084 final graph demonstrably acyclic; never intentionally run a hanging circular require.
-S085 immutable configuration cannot be changed by consumer mutation.
-S086 require caching/identity in one server VM.
-S087 require has minimal side effects.
-S088 explicit Init/Start lifecycle; require alone does not Start.
-S089 dependency injection rather than hard-coded lookup.
-S090 usable non-nil module return.
-S091 private helper declaration order is correct.
-S092 server-only module is required only from server code.
-S093 deterministic three-module A -> B -> C graph.
-S094 two caller paths share one common helper behavior.
-
-EXECUTION
-1. If currently Play mode, stop Play once.
-2. Inspect only the existing SP07 harness and narrowly scoped SP07 sibling ModuleScripts under ServerScriptService.__QWEN_SCRIPT_BENCH__. Do not touch SP01-SP06.
-3. Preserve every completed benchmark harness. Do not delete old packs or SP07 artifacts.
-4. For any NEW ModuleScript, use create_instances with className="ModuleScript" and Source exactly "-- QWEN_CONTROLLER_SCRIPT_BOOTSTRAP", then script_read exact new path before replacing bootstrap with real source. Never use execute_luau to create Script/ModuleScript or assign Source.
-5. For the existing SP07 driver, current script_read is authority. Do not recreate it and do not overwrite blindly.
-6. Keep the dependency graph acyclic. Use a small shared harness set, not 14 independent missions.
-7. After all needed source writes/rereads, start Play once and collect get_console_output evidence for labeled [SP07] S081 through S094. On a stale Studio-target error, list_roblox_studios once then retry the SAME required action once.
-8. Every S081-S094 must be directly proven. Stop Play after evidence.
-9. Call supervisor_decision_trace summarizing the direct evidence and the decision to commit results.
-10. Call supervisor_benchmark_record with run_id EXACTLY "scripting-s001-s024-structured-run6-20260829T0806Z", exactly S081-S094 as PASS only if proven, and pack_complete=["SP07"]. Do NOT set batch_complete.
-11. Require controller heartbeat state for this SAME run: tests_seen=94, pass=94, partial=0, fail=0, pack markers SP01-SP07, gate clear.
-12. Emit [TASK_COMPLETE] and stop.
-
-If a mutation/tool call fails, do not retry the identical action without new evidence. Record a concise supervisor_decision_trace describing the failure and changed plan first.
+Stop immediately.
