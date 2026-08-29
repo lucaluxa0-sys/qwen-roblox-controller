@@ -196,60 +196,91 @@ Also note: S007's stored reason was accidentally changed by an older hold-task b
 
 ---
 
-## 6. Current deliberate pause / shutdown work
+## 6. Current deliberate pause / Qwen power controls
 
-The user paused autonomous Roblox benchmark work near the end of the previous chat.
+The user paused autonomous Roblox benchmark work and explicitly requested a **Power Off / Power On** control pair instead of only a Stop button.
 
-Current remote task at handoff:
+### Controller 6.3.32
 
-`hold-for-stop-button-6.3.31-20260829T0542PT`
+6.3.32 was created and promoted to stable on GitHub after CI passed.
 
-It tells Qwen to do no Roblox work and wait until the Stop Qwen button controller is live.
+Release:
 
-### Controller 6.3.30
+`releases/6.3.32/controller.py`
 
-6.3.30 is current stable/live and added:
+Release commit:
 
-`supervisor_stop_local_qwen_stack`
+`3f7ace82addaf3d7b41a6ebff9ea9b1936c75a89`
 
-It stops:
-- full-auto manager
+Stable promotion commit:
+
+`d4aeeace72d69237a3164b8bce13a27fb0aa4496`
+
+Published SHA-256:
+
+`9508b40e7ed1827b36d2b9f8fee71bddc791eb84ee25b52b1b3e4c98735f507d`
+
+New controller tool:
+
+`supervisor_install_qwen_power_buttons`
+
+It installs two local scripts:
+
+```text
+%LOCALAPPDATA%\QwenRobloxAgent\POWER_OFF_QWEN.ps1
+%LOCALAPPDATA%\QwenRobloxAgent\POWER_ON_QWEN.ps1
+```
+
+and two desktop shortcuts:
+
+```text
+Desktop\Power Off Qwen.lnk
+Desktop\Power On Qwen.lnk
+```
+
+Power Off stops:
+- `qwen_full_auto_manager.py`
 - autonomous runner
-- controller/launcher/updaters
-- LM Studio `llama-server.exe`
+- controller / launcher
+- controller/model updaters
+- LM Studio `llama-server.exe` under `.lmstudio\extensions\backends`
 
-It preserves:
+Power Off intentionally preserves:
 - Roblox Studio
 - LM Studio GUI
 
-### Controller 6.3.31 candidate
+Power On starts the full stack through the single normal entrypoint:
 
-A candidate exists:
+`%LOCALAPPDATA%\QwenRobloxAgent\qwen_full_auto_manager.py`
 
-`releases/6.3.31/controller.py`
+using the local Python/PythonW install. The manager is responsible for restoring the controller, LM Studio model/server, autopilot, and updater state.
 
-Commit:
+### PowerShell commands requested by the user
 
-`fd7e4cc69003101a30ca904f9fb4c31bc3fdfca9`
+After 6.3.32 is live and `supervisor_install_qwen_power_buttons` has successfully installed the scripts, these are the manual commands:
 
-Purpose: add a clickable Windows **Stop Qwen** desktop shortcut plus local fallback:
+Power OFF:
 
-`STOP_QWEN.ps1`
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File "$env:LOCALAPPDATA\QwenRobloxAgent\POWER_OFF_QWEN.ps1"
+```
 
-Expected shortcut:
+Power ON:
 
-`Desktop\Stop Qwen.lnk`
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File "$env:LOCALAPPDATA\QwenRobloxAgent\POWER_ON_QWEN.ps1"
+```
 
-Expected controller tool:
+Equivalent from inside an already-open PowerShell window:
 
-`supervisor_install_stop_qwen_button`
+```powershell
+& "$env:LOCALAPPDATA\QwenRobloxAgent\POWER_OFF_QWEN.ps1"
+& "$env:LOCALAPPDATA\QwenRobloxAgent\POWER_ON_QWEN.ps1"
+```
 
-At the moment this handoff was written:
-- 6.3.31 exists in releases
-- stable/live is still 6.3.30
-- `latest.json` still points to 6.3.30
+The older `supervisor_install_stop_qwen_button` name remains only as a backward-compatible alias and now installs the paired power controls.
 
-The next ChatGPT should check CI/promotion/manifest/heartbeat before doing anything with 6.3.31. Do not assume it was promoted.
+Important: publishing/promoting 6.3.32 is not the same as proving it is live locally. Always verify the private heartbeat shows controller live/disk 6.3.32 before asking Qwen to install the buttons. Do not power the stack off unless the user explicitly asks to actually shut it down.
 
 ---
 
@@ -429,7 +460,7 @@ Then:
 1. Fresh-check heartbeat issue #1.
 2. Fresh-check `latest.json`, stable controller, 6.3.31 CI/promotion status, and current remote task.
 3. Respect the user pause. Do not resume Roblox benchmarks unless the user explicitly resumes them.
-4. If the user still wants the Stop Qwen button, finish 6.3.31 safely, prove it live, install the shortcut, then only shut the local stack down if the user explicitly authorizes shutdown.
+4. Finish/verify the 6.3.32 Power Off / Power On controls: prove 6.3.32 live from heartbeat, call supervisor_install_qwen_power_buttons once, verify both scripts/shortcuts were installed, and only actually power off if the user explicitly asks for shutdown.
 5. For the new 4B specialist-model project, treat the current controller/benchmark stack as the **data-generation + evaluation infrastructure** and begin designing the verified trajectory dataset / fine-tuning pipeline.
 
 ---
