@@ -1,5 +1,6 @@
-Benchmark-Run-ID: scripting-s001-s024-bootstrap-run3-20260829T0724Z
-This run ID is metadata only. NEVER use it as studio_id.
+Task-Instance: scripting-s001-s024-bootstrap-run4-20260829T0734Z
+Benchmark-Run-ID: scripting-s001-s024-bootstrap-run4-20260829T0734Z
+These IDs are metadata only. NEVER use either as studio_id.
 
 Run Scripting/Luau benchmark S001-S024 as two grouped packs: SP01=S001-S012 and SP02=S013-S024.
 
@@ -7,27 +8,39 @@ FIRST:
 - supervisor_resume(new_chat=true).
 - Work only in the actually connected Studio. If studio_id is stale, call list_roblox_studios and use the real connected ID.
 - Be in Edit mode before script_read/edit work.
-- Do not touch existing user content.
+- Do not touch existing user content. Work only under ServerScriptService.__QWEN_SCRIPT_BENCH__.
 
-MANDATORY NEW-SCRIPT SEQUENCE — DO NOT IMPROVISE:
+MANDATORY SCRIPT BOOTSTRAP FLOW — CONTROLLER 6.3.12:
 For each pack harness, use one benchmark-created Script under ServerScriptService.__QWEN_SCRIPT_BENCH__.
-1. Ensure benchmark Folder exists using the normal instance-creation tool.
-2. If the pack Script does not exist, create it with Source EXACTLY:
+
+A. Folder:
+1. Ensure ServerScriptService.__QWEN_SCRIPT_BENCH__ exists. Prefer the official create_instances tool for benchmark instance creation.
+
+B. New pack Script:
+2. If the pack Script does not exist, CALL THE TOOL NAMED create_instances and create a Script with Source EXACTLY:
 -- QWEN_CONTROLLER_SCRIPT_BOOTSTRAP
-3. Immediately script_read the exact new Script path.
-4. Only after that successful script_read, use the official transactional script edit tool to replace the exact bootstrap line with the full pack harness.
-5. Immediately script_read the exact path again to verify authoritative source.
-6. Start Play only when runtime evidence is needed; collect labeled Output for multiple tests in one pass.
-7. Stop Play before further source edits.
-8. NEVER use execute_luau to write Script.Source.
-9. If controller says source is not cached, do NOT retry the mutation. Perform script_read first.
-10. If a repair test would require intentionally creating invalid source that the guardrail refuses, mark that test PARTIAL:UNSAFE and continue instead of fighting the controller.
+3. Do NOT use execute_luau + Instance.new("Script"), LocalScript, or ModuleScript. Controller 6.3.12 intentionally blocks that path.
+4. Immediately script_read the exact new Script path.
+
+C. Leftover blank pack Script from an older failed run:
+5. If script_read proves the existing benchmark pack Script source is empty, do NOT recreate it blindly and do NOT retry a full harness edit.
+6. Use one transactional multi_edit on that exact cached empty source with old_string="" and new_string="-- QWEN_CONTROLLER_SCRIPT_BOOTSTRAP".
+7. Immediately script_read again. Only continue after the bootstrap line is authoritative.
+
+D. Harness write:
+8. Only after script_read proves Source is exactly the bootstrap line, use official transactional multi_edit to replace that exact line with the full pack harness.
+9. Immediately script_read again to verify authoritative source.
+10. Start Play only when runtime evidence is needed; collect labeled Output for multiple tests in one pass.
+11. Stop Play before any further source edit.
+12. NEVER use execute_luau to assign Script.Source.
+13. If controller says source is not cached, do NOT retry the mutation. Perform script_read first.
+14. If a test would require intentionally unsafe/invalid source that the guardrail refuses, mark that capability PARTIAL:UNSAFE and continue instead of fighting the controller.
 
 EFFICIENCY:
 - One harness per pack, not one script per test.
 - One Play session / Output retrieval per pack when possible.
 - Harness Output must label assertions by S### so evidence maps to individual capabilities.
-- Do not repeatedly inspect or rewrite after evidence is already sufficient.
+- Do not repeatedly inspect or rewrite after evidence is sufficient.
 
 RESULTS:
 Emit one standalone real result per test:
@@ -66,4 +79,4 @@ S024 declaration-order/closure repair.
 
 After S001-S012 are individually decided, emit standalone [BENCH_PACK_COMPLETE:SP01].
 After S013-S024 are individually decided, emit standalone [BENCH_PACK_COMPLETE:SP02].
-Then remove all benchmark-created artifacts, verify cleanup, emit standalone [BENCH_BATCH_COMPLETE:scripting-s001-s024-bootstrap-run3], and only with controller gate clear emit [TASK_COMPLETE].
+Then remove all benchmark-created artifacts, verify cleanup, emit standalone [BENCH_BATCH_COMPLETE:scripting-s001-s024-bootstrap-run4-20260829T0734Z], and only with controller gate clear emit [TASK_COMPLETE].
