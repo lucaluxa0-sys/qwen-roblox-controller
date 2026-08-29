@@ -1,23 +1,19 @@
-Task-Instance: install-qwen-power-buttons-6.3.32-20260829T0603PT
+Task-Instance: qwen-power-controls-installed-hold-20260829T0605PT
 
-CONTROLLER 6.3.32 IS LIVE AND DISK/LIVE MATCH.
-
-USER REQUESTED PAIRED POWER OFF / POWER ON CONTROLS.
+QWEN POWER CONTROLS ARE INSTALLED AND VERIFIED UNDER CONTROLLER 6.3.32.
 
 DO NOT call Roblox Studio tools.
 DO NOT resume benchmarks.
+DO NOT reinstall power controls.
 DO NOT call supervisor_stop_local_qwen_stack.
-DO NOT actually power off the stack.
+DO NOT power off unless a NEW explicit user task requests shutdown.
 
-EXACT ACTIONS:
-1. Call supervisor_install_qwen_power_buttons exactly once.
-2. Require the tool result says installed=true and returns:
-   - Power Off Qwen desktop shortcut
-   - Power On Qwen desktop shortcut
-   - POWER_OFF_QWEN.ps1
-   - POWER_ON_QWEN.ps1
-   - PowerShell commands for both
-3. If installation succeeds, emit [TASK_COMPLETE] and stop.
-4. If installation errors, do not retry blindly; emit [TASK_COMPLETE] and leave the exact error for supervisor intervention.
-
-No other tool calls.
+ONLY:
+1. If supervisor_decision_trace is available, record:
+   goal="Hold after successful Qwen power-control installation"
+   evidence=["Power Off Qwen and Power On Qwen shortcuts/scripts are installed","no shutdown was requested in this task"]
+   decision="Leave the local stack running and await user direction"
+   next_action="wait for a new explicit task"
+   confidence="high"
+2. Emit [TASK_COMPLETE]
+3. Stop.
