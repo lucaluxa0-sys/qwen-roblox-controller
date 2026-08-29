@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
-  "version": "6.3.9",
+  "version": "6.3.10",
   "channel": "stable",
   "controller_path": "stable/controller.py",
-  "release_path": "releases/6.3.9/controller.py",
-  "sha256": "8f61b7b533258b4c53df4f0407783c9e509952336eed9d53b8f1c803edefc4c3",
-  "published_at": "2026-08-29T06:37:59Z",
-  "notes": "Adds live scripting-benchmark progress to the private heartbeat, recognizes BENCH markers, and reduces the default heartbeat interval from 120 seconds to 60 seconds. Preserves remote-task proof and the automatic Qwen model updater."
+  "release_path": "releases/6.3.10/controller.py",
+  "sha256": "c00183ae778ea9ddfe7e0005fe34f673572e6a90fcd062aaf3fc088564c1834a",
+  "published_at": "2026-08-29T06:53:51Z",
+  "notes": "Optimizes scripting benchmarks as grouped capability packs instead of one Studio mission per capability. Heartbeat benchmark parsing now counts only standalone real result/completion markers, adds pack completion markers, and avoids false completion from prompt text. Preserves 60-second heartbeat, remote task proof, and the automatic Qwen model updater."
 }
