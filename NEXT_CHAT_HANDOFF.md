@@ -173,8 +173,8 @@ Important user preference: **implementation-first, minimal narration, autonomous
 
 Fresh heartbeat at the time this handoff was written:
 
-- live controller: **6.3.30**
-- disk controller: **6.3.30**
+- live controller: **6.3.32**
+- disk controller: **6.3.32**
 - disk/live match: **true**
 - Studio mode: **edit**
 - current blocker: **none**
@@ -280,7 +280,17 @@ Equivalent from inside an already-open PowerShell window:
 
 The older `supervisor_install_stop_qwen_button` name remains only as a backward-compatible alias and now installs the paired power controls.
 
-Important: publishing/promoting 6.3.32 is not the same as proving it is live locally. Always verify the private heartbeat shows controller live/disk 6.3.32 before asking Qwen to install the buttons. Do not power the stack off unless the user explicitly asks to actually shut it down.
+Verified after publication:
+- private heartbeat showed controller live **6.3.32**
+- disk controller **6.3.32**
+- disk/live match **true**
+- Qwen called `supervisor_install_qwen_power_buttons`
+- structured decision trace reported `accepted=true, installed=true`
+- desktop shortcuts were created at `%USERPROFILE%\Desktop\Power Off Qwen.lnk` and `Power On Qwen.lnk`
+- PowerShell scripts were created under `%LOCALAPPDATA%\QwenRobloxAgent\`
+- the legacy stop-button installer alias was also verified for compatibility
+
+The power controls are therefore installed and ready. Do **not** actually power the stack off unless the user explicitly requests shutdown.
 
 ---
 
@@ -460,7 +470,7 @@ Then:
 1. Fresh-check heartbeat issue #1.
 2. Fresh-check `latest.json`, stable controller, 6.3.31 CI/promotion status, and current remote task.
 3. Respect the user pause. Do not resume Roblox benchmarks unless the user explicitly resumes them.
-4. Finish/verify the 6.3.32 Power Off / Power On controls: prove 6.3.32 live from heartbeat, call supervisor_install_qwen_power_buttons once, verify both scripts/shortcuts were installed, and only actually power off if the user explicitly asks for shutdown.
+4. The 6.3.32 Power Off / Power On controls are already live and installed. If the user asks to power off, use the installed Power Off control/PowerShell command. If they later want the stack back, use Power On. Do not reinstall unless files/shortcuts are missing.
 5. For the new 4B specialist-model project, treat the current controller/benchmark stack as the **data-generation + evaluation infrastructure** and begin designing the verified trajectory dataset / fine-tuning pipeline.
 
 ---
