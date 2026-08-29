@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "interval_seconds": 300,
+  "updater": {
+    "version": "1.0.0",
+    "path": "agent/model_auto_updater.py",
+    "sha256": "9f185f2c45fa456dd1ad6c9370aba13d9e63fd6eb0d668e3aa23ee94ad209af0"
+  },
+  "model": {
+    "revision": 1,
+    "model_key": "qwen/qwen3.5-9b",
+    "model_identifier": "qwen/qwen3.5-9b",
+    "context_length": 60000,
+    "gpu": "0.59375",
+    "autopilot_rollover_at": 50000,
+    "format": "gguf",
+    "quantization": "",
+    "notes": "Current managed Qwen worker. Future manifest revisions can download and switch models automatically after a specific non-interactive quantization is declared."
+  }
+}
