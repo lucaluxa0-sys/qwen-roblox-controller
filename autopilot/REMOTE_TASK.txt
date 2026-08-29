@@ -1,16 +1,59 @@
-Task-Instance: e2e-heartbeat-20260829-remote-dispatch-v2
+Benchmark-Run-ID: scripting-s001-s024-run1-20260829T0638Z
+Metadata note: the Benchmark-Run-ID is NOT a Roblox studio_id and must never be passed to a Studio tool.
 
-Inspect the currently open Roblox Studio project using the Roblox MCP tools.
+Run Qwen Roblox Capability Suite 01 — Scripting / Luau, batch S001-S024.
 
-This is a read-only full-automation end-to-end test.
+This is an autonomous executable benchmark, not a tutorial. Use the currently connected Roblox Studio through the enforced Roblox MCP tools.
 
-Requirements:
+SAFETY / ISOLATION:
 - Call supervisor_resume(new_chat=true) first.
-- Do not modify the place, scripts, instances, properties, or settings.
-- Identify the current place/game name if available.
-- List the major top-level services/containers you can verify.
-- Check Roblox Studio Output for relevant current errors.
-- Use controller/tool evidence rather than guessing.
-- When the inspection is complete and the controller gate is clear, emit [TASK_COMPLETE].
+- If a saved studio_id is stale, call list_roblox_studios and use the actual connected Studio ID. Never guess or reuse the Benchmark-Run-ID as studio_id.
+- If Studio is in Play mode and an edit is required, stop Play safely first.
+- Do NOT modify any existing user scripts, instances, settings, assets, or player data.
+- Create benchmark artifacts only under ServerStorage.__QWEN_SCRIPT_BENCH__ and, only when a Script must execute in Play, ServerScriptService.__QWEN_SCRIPT_BENCH__.
+- You may create, edit, run, inspect, and delete only benchmark-created artifacts.
+- Clean up benchmark-created artifacts at the end of the batch.
+- Follow all controller gates, authoritative rereads, Output checks, and runtime verification requirements.
+- Do not bypass script mutation policy with execute_luau writing Script.Source.
 
-This Task-Instance line is intentionally unique. Reusing the same human-readable task later must use a new Task-Instance value so the one-shot remote task channel treats it as a new task.
+SCORING:
+For every test ID below, actually perform the test with authoritative evidence. After the test is decided, emit exactly one marker in your normal response text:
+[BENCH:S###:PASS]
+or
+[BENCH:S###:PARTIAL:<short reason>]
+or
+[BENCH:S###:FAIL:<MODEL|CONTROLLER|MCP|ENV|UNSAFE> <short reason>]
+
+Do not mark PASS from reasoning alone. A runtime-dependent test needs runtime/Output evidence. A source-edit test needs authoritative reread evidence.
+
+TESTS:
+- S001: Write valid Luau using arithmetic precedence, comparisons, booleans, strings, and parentheses; verify exact results.
+- S002: Repair one syntax error without changing unrelated behavior, then reread the authoritative source.
+- S003: Demonstrate the difference between assignment and equality comparison.
+- S004: Use and/or/not in a non-trivial expression and verify each branch.
+- S005: Use safe string formatting/interpolation with mixed numeric and string values.
+- S006: Handle division, modulo, negatives, and integer/floor behavior correctly.
+- S007: Use Luau compound assignment and verify the resulting state.
+- S008: Use comments and multiline strings without breaking parsing.
+- S009: Recognize and remove an operator copied from a non-Luau language.
+- S010: Construct an expression where evaluation order matters and prove the intended result.
+- S011: Use optional Luau type annotations without changing runtime behavior.
+- S012: Predict a short expression result first, execute it, and compare prediction to evidence.
+- S013: Demonstrate local scope without creating accidental globals.
+- S014: Demonstrate block shadowing and prove which value is read at each point.
+- S015: Safely handle a missing child returning nil before property access.
+- S016: Distinguish false from nil in branching.
+- S017: Use typeof and IsA appropriately for Roblox values and Instances.
+- S018: Guard an optional value before indexing it.
+- S019: Replace repeated magic values with named locals/constants.
+- S020: Use multiple assignment and multiple returns correctly.
+- S021: Use lexical capture of an outer local and verify mutation behavior.
+- S022: Avoid stale cached Instance references after destroy/recreate.
+- S023: Validate conversion between strings and numbers.
+- S024: Repair a declaration-order bug where a helper captures an unavailable local.
+
+BATCH FINISH:
+1. Verify no benchmark artifacts remain.
+2. Report counts for PASS/PARTIAL/FAIL.
+3. Emit [BENCH_BATCH_COMPLETE:scripting-s001-s024-run1]
+4. When the controller gate is clear, emit [TASK_COMPLETE].
