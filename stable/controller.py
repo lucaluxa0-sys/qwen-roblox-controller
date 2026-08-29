@@ -38,8 +38,8 @@ import urllib.request
 from pathlib import Path
 from typing import Any
 
-APP_NAME = "Qwen Roblox Enforced Proxy V6.1"
-VERSION = "6.1.0"
+APP_NAME = "Qwen Roblox Enforced Proxy V6.2"
+VERSION = "6.2.0"
 
 LOCALAPPDATA = Path(os.environ.get("LOCALAPPDATA", str(Path.home())))
 STATE_DIR = LOCALAPPDATA / "QwenRobloxEnforcedProxy"
@@ -63,7 +63,11 @@ TELEMETRY_ACTION_HISTORY_FILE = TELEMETRY_DIR / "action_history.jsonl"
 TELEMETRY_HEALTH_FILE = TELEMETRY_DIR / "controller_health.json"
 TELEMETRY_TEST_RESULTS_FILE = TELEMETRY_DIR / "test_results.json"
 TELEMETRY_AUTOPILOT_FILE = TELEMETRY_DIR / "autopilot_runs.jsonl"
+TELEMETRY_FAILURE_PACKET_FILE = TELEMETRY_DIR / "failure_packet.json"
+TELEMETRY_REGRESSION_CASES_FILE = TELEMETRY_DIR / "regression_cases.jsonl"
 TELEMETRY_SCHEMA_VERSION = 1
+DEADLOCK_BLOCK_WINDOW = int(os.environ.get("QWEN_DEADLOCK_BLOCK_WINDOW", "8"))
+DEADLOCK_REPEAT_LIMIT = int(os.environ.get("QWEN_DEADLOCK_REPEAT_LIMIT", "3"))
 TELEMETRY_MAX_STRING = int(os.environ.get("QWEN_TELEMETRY_MAX_STRING", "12000"))
 TELEMETRY_HISTORY_TAIL = int(os.environ.get("QWEN_TELEMETRY_HISTORY_TAIL", "30"))
 
@@ -537,6 +541,8 @@ def telemetry_status_payload(state: dict[str, Any] | None = None) -> dict[str, A
             "controller_health": str(TELEMETRY_HEALTH_FILE),
             "test_results": str(TELEMETRY_TEST_RESULTS_FILE),
             "autopilot_runs": str(TELEMETRY_AUTOPILOT_FILE),
+            "failure_packet": str(TELEMETRY_FAILURE_PACKET_FILE),
+            "regression_cases": str(TELEMETRY_REGRESSION_CASES_FILE),
         },
     }
 
@@ -576,6 +582,104 @@ def telemetry_record_action(event: dict[str, Any]) -> None:
         state_update(mutate)
     except Exception as exc:
         log(f"telemetry action write failed: {exc!r}")
+
+
+def _failure_classification(kind: str, message: str, state: dict[str, Any]) -> str:
+    low = f"{kind} {message}".lower()
+    gate = state.get("gate")
+    blocker = state.get("current_blocker")
+    if kind in {"controller_deadlock", "controller_state_conflict", "controller_internal_error"}:
+        return "controller_bug"
+    if "mcp" in low or "studio" in low and "disconnect" in low:
+        return "mcp_or_environment"
+    if kind in {"tool_result_error", "runtime_error"} or "runtime" in low:
+        return "runtime_or_tool_error"
+    if isinstance(gate, dict) and isinstance(blocker, dict):
+        if gate.get("stage") == "need_playtest" and blocker.get("classification") == "static_source_defect" and blocker.get("stage") == "repair_applied":
+            return "controller_bug"
+    if kind == "controller_block":
+        return "model_or_policy_block"
+    return "needs_review"
+
+
+def _compact_failure_packet(kind: str, message: str, tool_name: str, arguments: dict[str, Any], state: dict[str, Any]) -> dict[str, Any]:
+    history = list(state.get("action_history") or [])[-12:]
+    classification = _failure_classification(kind, message, state)
+    raw = json.dumps({
+        "kind": kind,
+        "classification": classification,
+        "tool": tool_name,
+        "blocker": state.get("current_blocker"),
+        "gate": state.get("gate"),
+        "tail": [(x.get("kind"), x.get("name"), x.get("sig")) for x in history if isinstance(x, dict)],
+    }, ensure_ascii=True, sort_keys=True, default=str)
+    regression_id = hashlib.sha256(raw.encode("utf-8", errors="replace")).hexdigest()[:20]
+    return {
+        "schema_version": TELEMETRY_SCHEMA_VERSION,
+        "generated_at": time.time(),
+        "regression_id": regression_id,
+        "version": VERSION,
+        "classification": classification,
+        "kind": kind,
+        "message": str(message)[:2000],
+        "tool_name": tool_name,
+        "arguments": arguments or {},
+        "current_blocker": state.get("current_blocker"),
+        "gate": state.get("gate"),
+        "next_required_action": next_required_action_from_state(state),
+        "studio_mode": state.get("studio_mode"),
+        "mutation_epoch": state.get("mutation_epoch", 0),
+        "play_session": state.get("play_session", 0),
+        "action_history_tail": history,
+        "verified_evidence": evidence_summary(state, max_items=8),
+    }
+
+
+def _write_failure_packet(packet: dict[str, Any], capture_regression: bool = False) -> None:
+    try:
+        _atomic_write_json(TELEMETRY_FAILURE_PACKET_FILE, packet)
+        if capture_regression:
+            with _telemetry_lock:
+                existing_ids = set()
+                if TELEMETRY_REGRESSION_CASES_FILE.exists():
+                    try:
+                        for line in TELEMETRY_REGRESSION_CASES_FILE.read_text(encoding="utf-8", errors="replace").splitlines()[-200:]:
+                            row = json.loads(line)
+                            if isinstance(row, dict) and row.get("regression_id"):
+                                existing_ids.add(str(row.get("regression_id")))
+                    except Exception:
+                        pass
+                if str(packet.get("regression_id")) not in existing_ids:
+                    _append_jsonl(TELEMETRY_REGRESSION_CASES_FILE, packet)
+    except Exception as exc:
+        log(f"failure packet write failed: {exc!r}")
+
+
+def _detect_block_deadlock(reason: str, name: str, args: dict[str, Any] | None) -> tuple[str, str] | None:
+    with _state_lock:
+        state = copy.deepcopy(STATE)
+    history = [x for x in list(state.get("action_history") or [])[-max(3, DEADLOCK_BLOCK_WINDOW):] if isinstance(x, dict)]
+    blocker = state.get("current_blocker")
+    gate = state.get("gate")
+    if isinstance(gate, dict) and isinstance(blocker, dict):
+        if (
+            gate.get("stage") == "need_playtest"
+            and blocker.get("classification") == "static_source_defect"
+            and blocker.get("stage") == "repair_applied"
+            and target_matches(blocker.get("path") or "", gate.get("target") or "")
+        ):
+            return ("controller_state_conflict", "Gate requires Play but a repaired static-source blocker still forbids Play for the same target.")
+    blocks = [x for x in history if x.get("kind") == "block"]
+    if len(blocks) >= DEADLOCK_REPEAT_LIMIT:
+        epoch = blocks[-1].get("mutation_epoch")
+        session = blocks[-1].get("play_session")
+        same_state = [x for x in blocks if x.get("mutation_epoch") == epoch and x.get("play_session") == session]
+        if len(same_state) >= DEADLOCK_REPEAT_LIMIT:
+            sigs = [x.get("sig") for x in same_state[-DEADLOCK_REPEAT_LIMIT:]]
+            notes = [str(x.get("note") or "") for x in same_state[-DEADLOCK_REPEAT_LIMIT:]]
+            if len(set(sigs)) <= 2 or len(set(notes)) <= 2:
+                return ("controller_deadlock", f"Detected {len(same_state)} blocked actions with no mutation/play progress. Stop retrying this loop and review the failure packet.")
+    return None
 
 
 def telemetry_record_failure(
@@ -639,6 +743,8 @@ def telemetry_record_failure(
             tel["last_failure_kind"] = kind
             tel["last_event_at"] = now
         state_update(mutate)
+        packet = _compact_failure_packet(kind, message, tool_name, arguments or {}, state_copy)
+        _write_failure_packet(packet, capture_regression=packet.get("classification") == "controller_bug")
         refresh_telemetry_files()
         return failure_id
     except Exception as exc:
@@ -2692,6 +2798,13 @@ def on_local_block(reason: str, name: str = "", args: dict[str, Any] | None = No
     telemetry_record_failure(
         "controller_block", reason, tool_name=name or "blocked_call", arguments=args or {}, severity=severity
     )
+    deadlock = _detect_block_deadlock(reason, name or "blocked_call", args or {})
+    if deadlock:
+        deadlock_kind, deadlock_message = deadlock
+        telemetry_record_failure(
+            deadlock_kind, deadlock_message, tool_name=name or "blocked_call", arguments=args or {}, severity="critical",
+            extra={"automatic": True, "retry_limit": DEADLOCK_REPEAT_LIMIT},
+        )
     refresh_checkpoint_files()
     log("BLOCK " + reason)
 
@@ -3823,6 +3936,20 @@ def self_test_main() -> int:
     if sanitized_meter.get("access_token") != "[REDACTED]":
         failures.append("sensitive access_token was not redacted")
 
+    # V6.2 regression: repaired source blocker + need_playtest is a controller conflict.
+    conflict_state = new_state()
+    conflict_state["gate"] = {"stage": "need_playtest", "target": "game.ServerScriptService.Test"}
+    conflict_state["current_blocker"] = {
+        "classification": "static_source_defect",
+        "stage": "repair_applied",
+        "path": "game.ServerScriptService.Test",
+    }
+    if _failure_classification("controller_state_conflict", "gate/blocker conflict", conflict_state) != "controller_bug":
+        failures.append("controller state conflict was not classified as controller_bug")
+    packet = _compact_failure_packet("controller_state_conflict", "gate/blocker conflict", "start_stop_play", {"is_start": True}, conflict_state)
+    if packet.get("classification") != "controller_bug" or not packet.get("regression_id"):
+        failures.append(f"compact failure packet invalid: {packet}")
+
     if failures:
         telemetry_write_test_results({
             "suite": "controller_self_test",
@@ -3837,7 +3964,7 @@ def self_test_main() -> int:
             severity="critical",
             extra={"failures": failures},
         )
-        print("V6.1 SELF-TEST FAILED")
+        print("V6.2 SELF-TEST FAILED")
         for row in failures:
             print(" -", row)
         return 1
@@ -3848,7 +3975,7 @@ def self_test_main() -> int:
         "failure_count": 0,
         "failures": [],
     })
-    print("V6.1 SELF-TEST PASSED")
+    print("V6.2 SELF-TEST PASSED")
     print(" - missing end rejected")
     print(" - unclosed delimiters rejected")
     print(" - common non-Luau operators rejected")
@@ -3879,7 +4006,7 @@ def telemetry_smoke_test_main() -> int:
         for row in problems:
             print(" -", row)
         return 1
-    print("V6.1 TELEMETRY SMOKE TEST PASSED")
+    print("V6.2 TELEMETRY SMOKE TEST PASSED")
     print(f" - telemetry directory: {TELEMETRY_DIR}")
     print(f" - status: {TELEMETRY_STATUS_FILE.name}")
     print(f" - health: {TELEMETRY_HEALTH_FILE.name}")
