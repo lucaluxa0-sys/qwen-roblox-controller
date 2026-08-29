@@ -39,8 +39,8 @@ import urllib.request
 from pathlib import Path
 from typing import Any
 
-APP_NAME = "Qwen Roblox Enforced Proxy V6.3.23"
-VERSION = "6.3.23"
+APP_NAME = "Qwen Roblox Enforced Proxy V6.3.24"
+VERSION = "6.3.24"
 
 LOCALAPPDATA = Path(os.environ.get("LOCALAPPDATA", str(Path.home())))
 STATE_DIR = LOCALAPPDATA / "QwenRobloxEnforcedProxy"
@@ -257,6 +257,16 @@ def new_state() -> dict[str, Any]:
             "goal": "",
             "next_action": "",
             "last_compacted_at": 0.0,
+        },
+        "qwen_decision_trace_gate": {
+            "last_at": 0.0,
+            "consumed": True,
+            "goal": "",
+            "decision": "",
+            "next_action": "",
+            "confidence": "",
+            "recorded_mutation_epoch": 0,
+            "recorded_play_session": 0,
         },
         "telemetry": {
             "last_failure_id": "",
@@ -1711,6 +1721,7 @@ def _diagnostic_snapshot() -> dict[str, Any]:
             "runtime_error_count": state.get("runtime_error_count", 0),
             "mcp_recovery": _telemetry_sanitize(state.get("mcp_recovery") or {}),
             "context_estimate": _telemetry_sanitize(state.get("context_estimate") or {}),
+            "qwen_decision_trace_gate": _telemetry_sanitize(state.get("qwen_decision_trace_gate") or {}),
         },
         "controller_health": {
             "controller_running": health.get("controller_running"),
@@ -4282,6 +4293,47 @@ def loop_guard_reason(name: str, args: dict[str, Any] | None) -> str | None:
 # -----------------------------------------------------------------------------
 
 
+def _qwen_decision_trace_required_for_call(name: str, args: dict[str, Any] | None) -> bool:
+    n = (name or "").lower()
+    args = args or {}
+    if n == "start_stop_play":
+        return args.get("is_start") is True
+    if n == "supervisor_benchmark_record":
+        return True
+    return tool_is_mutation(name, args)
+
+
+def _qwen_decision_trace_gate_reason(name: str, args: dict[str, Any] | None, state: dict[str, Any]) -> str | None:
+    if not _qwen_decision_trace_required_for_call(name, args):
+        return None
+    gate = state.get("qwen_decision_trace_gate")
+    if not isinstance(gate, dict):
+        return (
+            "Blocked by V6.3.24 decision-trace gate: record a concise supervisor_decision_trace before this meaningful action. "
+            "Summarize goal, direct evidence, decision, expected result, next action, and confidence; do not provide hidden chain-of-thought."
+        )
+    last_at = float(gate.get("last_at", 0.0) or 0.0)
+    consumed = bool(gate.get("consumed", True))
+    if last_at <= 0.0 or consumed:
+        return (
+            "Blocked by V6.3.24 decision-trace gate: record a fresh supervisor_decision_trace before this meaningful action. "
+            "One trace authorizes one mutation or Play start; if an action errors, trace the changed plan before retrying."
+        )
+    if time.time() - last_at > 300.0:
+        return (
+            "Blocked by V6.3.24 decision-trace gate: the previous decision summary is stale. "
+            "Record a fresh supervisor_decision_trace from current controller/Studio evidence before continuing."
+        )
+    return None
+
+
+def _consume_qwen_decision_trace_gate() -> None:
+    def consume(state: dict[str, Any]) -> None:
+        gate = state.setdefault("qwen_decision_trace_gate", {})
+        gate["consumed"] = True
+    state_update(consume)
+
+
 def block_reason_for_call(name: str, args: dict[str, Any] | None) -> str | None:
     n = (name or "").lower()
     args = args or {}
@@ -4296,6 +4348,11 @@ def block_reason_for_call(name: str, args: dict[str, Any] | None) -> str | None:
 
     with _state_lock:
         state = copy.deepcopy(STATE)
+
+    trace_reason = _qwen_decision_trace_gate_reason(name, args, state)
+    if trace_reason:
+        return trace_reason
+
     blocker = state.get("current_blocker")
     gate = state.get("gate")
     mode = state.get("studio_mode")
@@ -4591,6 +4648,9 @@ def on_local_block(reason: str, name: str = "", args: dict[str, Any] | None = No
 
 
 def on_forwarded_call(name: str, args: dict[str, Any] | None) -> None:
+    if _qwen_decision_trace_required_for_call(name, args):
+        _consume_qwen_decision_trace_gate()
+
     def mutate(state: dict[str, Any]):
         state["forwarded_count"] = int(state.get("forwarded_count", 0)) + 1
         target = extract_target(args)
@@ -5274,6 +5334,19 @@ def _record_qwen_decision_trace(args: dict[str, Any]) -> tuple[dict[str, Any] | 
             _append_jsonl(TELEMETRY_QWEN_DECISION_TRACE_FILE, row)
     except Exception as exc:
         return None, f"Could not persist Qwen decision trace: {exc!r}"
+
+    def arm_trace_gate(state_row: dict[str, Any]) -> None:
+        gate = state_row.setdefault("qwen_decision_trace_gate", {})
+        gate["last_at"] = row["at"]
+        gate["consumed"] = False
+        gate["goal"] = payload.get("goal", "")
+        gate["decision"] = payload.get("decision", "")
+        gate["next_action"] = payload.get("next_action", "")
+        gate["confidence"] = payload.get("confidence", "")
+        gate["recorded_mutation_epoch"] = int(state_row.get("mutation_epoch", 0) or 0)
+        gate["recorded_play_session"] = int(state_row.get("play_session", 0) or 0)
+    state_update(arm_trace_gate)
+
     return {
         "accepted": True,
         "at": row["at"],
@@ -5428,6 +5501,7 @@ def status_payload() -> dict[str, Any]:
         "mcp_recovery": s.get("mcp_recovery", {}),
         "context_estimate": s.get("context_estimate", {}),
         "mutation_epoch": s.get("mutation_epoch", 0),
+        "qwen_decision_trace_gate": _telemetry_sanitize(s.get("qwen_decision_trace_gate") or {}),
         "next_required_action": next_required_action_from_state(s),
         "cached_tool_schemas": len(TOOL_SCHEMAS),
         "cached_script_sources": len(SOURCE_CACHE),
@@ -5771,6 +5845,23 @@ def handle_parent_message(child: subprocess.Popen[str], message: dict[str, Any])
                     emit(mcp_tool_ok_response(request_id, payload))
             return
         if name == "supervisor_benchmark_record":
+            with _state_lock:
+                trace_state = copy.deepcopy(STATE)
+            trace_reason = _qwen_decision_trace_gate_reason("supervisor_benchmark_record", {"commit": True}, trace_state)
+            # supervisor_benchmark_record is controller-local and therefore is
+            # explicitly treated as a meaningful commit even though it is not a Roblox mutation.
+            if trace_reason is None:
+                gate = trace_state.get("qwen_decision_trace_gate")
+                if not isinstance(gate, dict) or bool(gate.get("consumed", True)):
+                    trace_reason = (
+                        "Blocked by V6.3.24 decision-trace gate: record a fresh supervisor_decision_trace "
+                        "summarizing the direct benchmark evidence before committing results."
+                    )
+            if trace_reason:
+                if "id" in message:
+                    emit(mcp_tool_error_response(request_id, trace_reason))
+                return
+            _consume_qwen_decision_trace_gate()
             payload, record_reason = _record_benchmark_submission(args)
             if "id" in message:
                 if record_reason:
@@ -6596,6 +6687,43 @@ def self_test_main() -> int:
             f"candidate={noop_candidate!r} reason={noop_reason!r}"
         )
 
+    # V6.3.24 regression: meaningful actions require a fresh, unconsumed
+    # structured Qwen decision summary; routine reads and safe Play stop do not.
+    trace_gate_state = new_state()
+    trace_gate_state["qwen_decision_trace_gate"] = {
+        "last_at": 0.0,
+        "consumed": True,
+    }
+    no_trace_reason = _qwen_decision_trace_gate_reason(
+        "multi_edit",
+        {"file_path": "ServerScriptService.Test", "edits": [{"old_string": "a", "new_string": "b"}]},
+        trace_gate_state,
+    )
+    if not no_trace_reason or "decision-trace gate" not in no_trace_reason:
+        failures.append(f"V6.3.24 mutation without trace was not rejected: {no_trace_reason!r}")
+    if _qwen_decision_trace_gate_reason("script_read", {"file_path": "ServerScriptService.Test"}, trace_gate_state):
+        failures.append("V6.3.24 routine script_read incorrectly required decision trace")
+    if _qwen_decision_trace_gate_reason("start_stop_play", {"is_start": False}, trace_gate_state):
+        failures.append("V6.3.24 safe Play stop incorrectly required decision trace")
+    trace_gate_state["qwen_decision_trace_gate"] = {
+        "last_at": time.time(),
+        "consumed": False,
+    }
+    armed_reason = _qwen_decision_trace_gate_reason(
+        "create_instances",
+        {"instances": [{"className": "Folder", "name": "X"}]},
+        trace_gate_state,
+    )
+    if armed_reason:
+        failures.append(f"V6.3.24 fresh trace did not authorize mutation: {armed_reason!r}")
+    benchmark_trace_reason = _qwen_decision_trace_gate_reason(
+        "supervisor_benchmark_record",
+        {"commit": True},
+        trace_gate_state,
+    )
+    if benchmark_trace_reason:
+        failures.append(f"V6.3.24 fresh trace did not authorize benchmark commit: {benchmark_trace_reason!r}")
+
     # V6.3.23 regression: Qwen decision summaries are structured, bounded, and explicit.
     valid_trace, valid_trace_reason = _validate_qwen_decision_trace({
         "goal": "Verify current benchmark pack",
@@ -6743,6 +6871,10 @@ def self_test_main() -> int:
         failures.append("V6.3.18 wrong benchmark Script creation incorrectly matched missing target")
     benchmark_missing_state = new_state()
     benchmark_missing_state["studio_mode"] = "edit"
+    benchmark_missing_state["qwen_decision_trace_gate"] = {
+        "last_at": time.time(),
+        "consumed": False,
+    }
     benchmark_missing_state["current_blocker"] = {
         "classification": "benchmark_script_missing",
         "path": missing_target,
@@ -6792,6 +6924,10 @@ def self_test_main() -> int:
     }
     missing_state_6320 = new_state()
     missing_state_6320["studio_mode"] = "edit"
+    missing_state_6320["qwen_decision_trace_gate"] = {
+        "last_at": time.time(),
+        "consumed": False,
+    }
     missing_state_6320["current_blocker"] = {
         "classification": "benchmark_script_missing",
         "path": missing_target_6320,
