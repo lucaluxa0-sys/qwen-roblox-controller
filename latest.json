@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
-  "version": "6.3.14",
+  "version": "6.3.15",
   "channel": "stable",
-  "controller_path": "releases/6.3.14/controller.py",
-  "release_path": "releases/6.3.14/controller.py",
-  "sha256": "721869b093d424fc7cdd6e9586a24dabcdcec1e6addc0afd3f659778bb176db9",
-  "published_at": "2026-08-29T07:50:18Z",
-  "notes": "Uses the immutable 6.3.14 release artifact as controller_path to avoid raw branch-propagation races after stable promotion. Adds the benchmark whole-tree context guard and includes the 6.3.13 inert-bootstrap runtime-gate exemption."
+  "controller_path": "releases/6.3.15/controller.py",
+  "release_path": "releases/6.3.15/controller.py",
+  "sha256": "d84b1486c7160d4fe11e44604d9659a1e6b69517c83486c982310ae21dd7252d",
+  "published_at": "2026-08-29T07:54:44Z",
+  "notes": "Pins the immutable 6.3.15 release artifact for updater reliability. Requires at least one concrete S### BENCH result before pack/batch completion markers can count, preventing standalone prompt markers from producing false completion. Includes 6.3.14 benchmark whole-tree context guard and 6.3.13 inert-bootstrap runtime-gate exemption."
 }
