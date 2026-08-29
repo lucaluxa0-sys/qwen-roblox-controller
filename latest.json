@@ -1,11 +1,11 @@
 {
   "schema_version": 1,
-  "version": "6.3.30",
+  "version": "6.3.32",
   "channel": "stable",
-  "controller_path": "releases/6.3.30/controller.py",
-  "release_path": "releases/6.3.30/controller.py",
-  "sha256": "cda4367d95b593c31e7831fdb39224ab7f033d1f8a062a1c36728d713e06db39",
-  "published_at": "2026-08-29T12:38:00Z",
-  "notes": "Adds an explicit user-authorized supervisor_stop_local_qwen_stack command that stops the full-auto manager, autonomous runner, and LM Studio llama-server backend while preserving Roblox Studio and the LM Studio GUI.",
-  "url": "https://raw.githubusercontent.com/lucaluxa0-sys/qwen-roblox-controller/main/releases/6.3.30/controller.py"
+  "controller_path": "releases/6.3.32/controller.py",
+  "release_path": "releases/6.3.32/controller.py",
+  "sha256": "9508b40e7ed1827b36d2b9f8fee71bddc791eb84ee25b52b1b3e4c98735f507d",
+  "published_at": "2026-08-29T12:59:10Z",
+  "notes": "Adds paired Power Off Qwen / Power On Qwen controls, local POWER_OFF_QWEN.ps1 and POWER_ON_QWEN.ps1 PowerShell commands, desktop shortcuts, and a full-auto-manager restart path while preserving Roblox Studio and the LM Studio GUI during power off.",
+  "url": "https://raw.githubusercontent.com/lucaluxa0-sys/qwen-roblox-controller/main/releases/6.3.32/controller.py"
 }
