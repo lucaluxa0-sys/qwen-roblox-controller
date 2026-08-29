@@ -39,8 +39,8 @@ import urllib.request
 from pathlib import Path
 from typing import Any
 
-APP_NAME = "Qwen Roblox Enforced Proxy V6.3.27"
-VERSION = "6.3.27"
+APP_NAME = "Qwen Roblox Enforced Proxy V6.3.28"
+VERSION = "6.3.28"
 
 LOCALAPPDATA = Path(os.environ.get("LOCALAPPDATA", str(Path.home())))
 STATE_DIR = LOCALAPPDATA / "QwenRobloxEnforcedProxy"
@@ -1612,11 +1612,11 @@ def _validate_benchmark_record_request(
         prior = existing_results.get(test_id)
         if isinstance(prior, dict):
             prior_status = str(prior.get("status") or "").upper().strip()
-            if prior_status and prior_status != status:
-                return [], (
-                    f"Refusing to rewrite existing controller-verified result {test_id} from {prior_status} to {status}. "
-                    "Use a new intentional benchmark run for a retest instead of mutating history."
-                )
+            return [], (
+                f"Refusing to resubmit existing controller-verified result {test_id} ({prior_status or 'DECIDED'}). "
+                "A capability decision is immutable inside one benchmark run, including its evidence reason. "
+                "Do not use an already-decided S### as a task-completion/status marker."
+            )
 
     # Validation must use the complete run event set. benchmark_progress.results
     # is intentionally truncated for heartbeat display, so it cannot be the
@@ -7053,8 +7053,15 @@ def self_test_main() -> int:
         "run_id": "scripting-s001-s024-structured-run6-20260829T0806Z",
         "results": [{"test_id": "S080", "status": "FAIL"}],
     }, ["[BENCH:S080:PASS]"])
-    if not immutable_reason_6326 or "Refusing to rewrite existing controller-verified result" not in immutable_reason_6326:
-        failures.append(f"V6.3.26 existing result status could be rewritten: {immutable_reason_6326!r}")
+    if not immutable_reason_6326 or "Refusing to resubmit existing controller-verified result" not in immutable_reason_6326:
+        failures.append(f"V6.3.26/28 existing result status could be rewritten: {immutable_reason_6326!r}")
+
+    _, immutable_reason_same_6328 = _validate_benchmark_record_request({
+        "run_id": "scripting-s001-s024-structured-run6-20260829T0806Z",
+        "results": [{"test_id": "S080", "status": "PASS", "reason": "new unrelated reason"}],
+    }, ["[BENCH:S080:PASS:original evidence]"])
+    if not immutable_reason_same_6328 or "evidence reason" not in immutable_reason_same_6328:
+        failures.append(f"V6.3.28 same-status result reason could be rewritten: {immutable_reason_same_6328!r}")
 
     # V6.3.18 regression: a benchmark Script proven missing in confirmed Edit mode
     # has one deterministic recovery: exact create_instances bootstrap, then reread.
