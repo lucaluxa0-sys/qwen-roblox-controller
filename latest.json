@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
-  "version": "6.3.13",
+  "version": "6.3.14",
   "channel": "stable",
   "controller_path": "stable/controller.py",
-  "release_path": "releases/6.3.13/controller.py",
-  "sha256": "6d49765d909685ee8377239d7160e155fae7f030128d947cd62ee9ccc8b17c4b",
-  "published_at": "2026-08-29T07:45:34Z",
-  "notes": "Skips unnecessary Play/Output verification for blank-to-bootstrap initialization. The inert controller bootstrap still requires an authoritative script_read reread, but once verified it clears the gate so Qwen can immediately perform the real transactional harness edit. Runtime verification remains mandatory for the actual gameplay script edit."
+  "release_path": "releases/6.3.14/controller.py",
+  "sha256": "721869b093d424fc7cdd6e9586a24dabcdcec1e6addc0afd3f659778bb176db9",
+  "published_at": "2026-08-29T07:50:18Z",
+  "notes": "Adds a benchmark-specific context guard: when the active target is already inside __QWEN_SCRIPT_BENCH__, pathless search_game_tree calls are blocked and redirected to the exact script or a narrow benchmark parent path. This prevents repeated whole-DataModel dumps from consuming thousands of prompt tokens. Includes the 6.3.13 inert-bootstrap runtime-gate exemption."
 }
