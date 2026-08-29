@@ -39,8 +39,8 @@ import urllib.request
 from pathlib import Path
 from typing import Any
 
-APP_NAME = "Qwen Roblox Enforced Proxy V6.3.20"
-VERSION = "6.3.20"
+APP_NAME = "Qwen Roblox Enforced Proxy V6.3.21"
+VERSION = "6.3.21"
 
 LOCALAPPDATA = Path(os.environ.get("LOCALAPPDATA", str(Path.home())))
 STATE_DIR = LOCALAPPDATA / "QwenRobloxEnforcedProxy"
@@ -1554,12 +1554,33 @@ def _validate_benchmark_record_request(
     required_by_pack = {
         "SP01": {f"S{i:03d}" for i in range(1, 13)},
         "SP02": {f"S{i:03d}" for i in range(13, 25)},
+        "SP03": {f"S{i:03d}" for i in range(25, 37)},
+        "SP04": {f"S{i:03d}" for i in range(37, 53)},
+        "SP05": {f"S{i:03d}" for i in range(53, 69)},
+        "SP06": {f"S{i:03d}" for i in range(69, 81)},
+        "SP07": {f"S{i:03d}" for i in range(81, 95)},
+        "SP08": {f"S{i:03d}" for i in range(95, 109)},
+        "SP09": {f"S{i:03d}" for i in range(109, 123)},
+        "SP10": {f"S{i:03d}" for i in range(123, 139)},
+        "SP11": {f"S{i:03d}" for i in range(139, 151)},
+        "SP12": {f"S{i:03d}" for i in range(151, 163)},
+        "SP13": {f"S{i:03d}" for i in range(163, 179)},
+        "SP14": {f"S{i:03d}" for i in range(179, 191)},
+        "SP15": {f"S{i:03d}" for i in range(191, 205)},
+        "SP16": {f"S{i:03d}" for i in range(205, 219)},
+        "SP17": {f"S{i:03d}" for i in range(219, 233)},
+        "SP18": {f"S{i:03d}" for i in range(233, 247)},
+        "SP19": {f"S{i:03d}" for i in range(247, 259)},
+        "SP20": {f"S{i:03d}" for i in range(259, 271)},
+        "SP21": {f"S{i:03d}" for i in range(271, 281)},
     }
     for pack in packs:
         if len(pack) > 160 or "]" in pack or "\n" in pack or "\r" in pack:
             return [], f"Invalid pack ID {pack!r}."
         required = required_by_pack.get(pack.upper())
-        if required and not required.issubset(decided):
+        if required is None:
+            return [], f"Unknown benchmark pack ID {pack!r}; expected SP01-SP21."
+        if not required.issubset(decided):
             missing = sorted(required - decided)
             return [], f"{pack} cannot complete; missing concrete decisions: {', '.join(missing)}."
         markers.append(f"[BENCH_PACK_COMPLETE:{pack}]")
@@ -5091,8 +5112,8 @@ SUPERVISOR_BENCHMARK_RECORD_TOOL = {
     "name": "supervisor_benchmark_record",
     "description": (
         "Controller-owned benchmark reporting. After real evidence exists, submit multiple S### decisions in one structured call. "
-        "Use this instead of printing BENCH markers through execute_luau. SP01/SP02 completion is rejected until every capability "
-        "in that pack has a concrete decision; batch completion is rejected until S001-S024 and both packs are complete."
+        "Use this instead of printing BENCH markers through execute_luau. SP01-SP21 pack completion is rejected until every "
+        "capability assigned to that pack has a concrete decision. The legacy starter batch completion remains scoped to S001-S024/SP01-SP02."
     ),
     "inputSchema": {
         "type": "object",
@@ -6408,6 +6429,33 @@ def self_test_main() -> int:
     }, [])
     if not early_pack_reason or "missing concrete decisions" not in early_pack_reason:
         failures.append(f"V6.3.17 premature SP01 completion was not rejected: {early_pack_reason!r}")
+
+    # V6.3.21 regression: every scripting pack is controller-validated, not just SP01/SP02.
+    sp03_rows = [
+        {"test_id": f"S{i:03d}", "status": "PASS", "reason": "verified"}
+        for i in range(25, 37)
+    ]
+    sp03_markers, sp03_reason = _validate_benchmark_record_request({
+        "run_id": "selftest-sp03",
+        "results": sp03_rows,
+        "pack_complete": ["SP03"],
+    }, [])
+    if sp03_reason or len(sp03_markers) != 13 or sp03_markers[-1] != "[BENCH_PACK_COMPLETE:SP03]":
+        failures.append(f"V6.3.21 valid SP03 structured record rejected: {sp03_reason!r} {sp03_markers!r}")
+    _, early_sp03_reason = _validate_benchmark_record_request({
+        "run_id": "selftest-sp03",
+        "results": [{"test_id": "S025", "status": "PASS"}],
+        "pack_complete": ["SP03"],
+    }, [])
+    if not early_sp03_reason or "missing concrete decisions" not in early_sp03_reason:
+        failures.append(f"V6.3.21 premature SP03 completion was not rejected: {early_sp03_reason!r}")
+    _, unknown_pack_reason = _validate_benchmark_record_request({
+        "run_id": "selftest-unknown-pack",
+        "results": [{"test_id": "S025", "status": "PASS"}],
+        "pack_complete": ["SP99"],
+    }, [])
+    if not unknown_pack_reason or "Unknown benchmark pack ID" not in unknown_pack_reason:
+        failures.append(f"V6.3.21 unknown pack was not rejected: {unknown_pack_reason!r}")
     fake_rows = [
         {"event": "[BENCH:S001:PASS]", "event_kind": "benchmark_record", "benchmark_run_id": "old-run"},
         {"event": "[BENCH:S013:PASS]", "event_kind": "benchmark_record", "benchmark_run_id": "new-run"},
