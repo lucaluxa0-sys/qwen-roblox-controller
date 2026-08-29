@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
-  "version": "6.3.7",
+  "version": "6.3.8",
   "channel": "stable",
   "controller_path": "stable/controller.py",
-  "release_path": "releases/6.3.7/controller.py",
-  "sha256": "1cc3ab33cbc1d536820d041e2715247e089d5489407c5be9504d40571f03b9f4",
-  "published_at": "2026-08-29T06:15:52Z",
-  "notes": "Private diagnostic heartbeat plus automatic hash-verified bootstrap of the Qwen model auto-updater. The model updater checks every 5 minutes, can self-update, downloads a declared LM Studio model before switching, changes only managed model settings, and lets the full-auto manager reload and resume the autopilot."
+  "release_path": "releases/6.3.8/controller.py",
+  "sha256": "718cb52a0fa329152971d3681f8fbb4fb692d9bb68cc8c9b5a018ee70a982230",
+  "published_at": "2026-08-29T06:26:24Z",
+  "notes": "Adds remote-task dispatch proof to the private diagnostic heartbeat. Reissued one-shot tasks use a unique Task-Instance value so the same human-readable goal can intentionally create a fresh autopilot generation. Preserves the automatic Qwen model-updater bootstrap from 6.3.7."
 }
