@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
-  "version": "6.3.1",
+  "version": "6.3.2",
   "channel": "stable",
   "controller_path": "stable/controller.py",
-  "release_path": "releases/6.3.1/controller.py",
-  "sha256": "906ef6ac7228ef8c0f8a64c4351a41d1bc1dbd637230fac4c34175c81db4549a",
-  "published_at": "2026-08-29T04:43:00Z",
-  "notes": "Allows list_roblox_studios as a safe recovery/discovery action through exact post-edit verification gates so a disconnected/stale Studio ID cannot deadlock required playtest recovery."
+  "release_path": "releases/6.3.2/controller.py",
+  "sha256": "af264f68565d5c5cabaa6d0242394ead7baabe06a97d2676aeb1e869918b7d8f",
+  "published_at": "2026-08-29T04:53:00Z",
+  "notes": "Prevents a stale repair_applied static-source blocker from deadlocking post-repair verification after Play starts. The verification gate is authoritative through Play, Output, runtime evidence, and visual checks, including across controller/autopilot restarts."
 }
