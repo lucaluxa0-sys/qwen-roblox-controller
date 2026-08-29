@@ -1,20 +1,25 @@
-Task-Instance: run6-complete-wait-6.3.21-20260829T0901Z
+Task-Instance: run6-postcomplete-gate-recovery-20260829T0904Z
 
-RUN6 IS COMPLETE.
-Controller-verified benchmark_progress already shows:
-- tests_seen=24
-- pass=24
-- partial=0
-- fail=0
-- pack_complete=SP01,SP02
-- batch_complete=scripting-s001-s024-structured-run6-20260829T0806Z
+RUN6 IS ALREADY CONTROLLER-VERIFIED COMPLETE: 24/24 PASS, SP01+SP02 complete, batch marker accepted.
 
-DO NOT touch Roblox Studio.
-DO NOT rerun SP01 or SP02.
-DO NOT call benchmark tools.
-DO NOT inspect source or Output.
+A previous generation incorrectly touched the completed SP02 script after completion. DO NOT continue cleanup or benchmark work.
 
-ONLY ACTION: emit exactly:
-[TASK_COMPLETE]
+CURRENT CONTROLLER GATE REQUIRES EXACTLY ONE RECOVERY:
+1. Call script_read on exactly:
+   ServerScriptService.__QWEN_SCRIPT_BENCH__.SP02_ScriptingTests
+2. If that exact script_read succeeds and clears the reread gate, emit exactly:
+   [TASK_COMPLETE]
+3. Stop immediately.
 
-Then stop. A new SP03 task will arrive separately after controller 6.3.21 is live.
+ABSOLUTELY FORBIDDEN:
+- multi_edit
+- execute_luau
+- create_instances
+- delete/move/rename anything
+- Play mode
+- Output inspection
+- benchmark reporting
+- touching SP01
+- any second mutation
+
+If the exact script_read reports Script not found, call get_studio_state once; if Edit mode, retry the SAME exact path once. Do not invent a new path and do not mutate anything.
