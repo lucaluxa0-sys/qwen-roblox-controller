@@ -39,8 +39,8 @@ import urllib.request
 from pathlib import Path
 from typing import Any
 
-APP_NAME = "Qwen Roblox Enforced Proxy V6.3.6"
-VERSION = "6.3.6"
+APP_NAME = "Qwen Roblox Enforced Proxy V6.3.7"
+VERSION = "6.3.7"
 
 LOCALAPPDATA = Path(os.environ.get("LOCALAPPDATA", str(Path.home())))
 STATE_DIR = LOCALAPPDATA / "QwenRobloxEnforcedProxy"
@@ -69,7 +69,25 @@ TELEMETRY_REGRESSION_CASES_FILE = TELEMETRY_DIR / "regression_cases.jsonl"
 TELEMETRY_GITHUB_REPORTER_FILE = TELEMETRY_DIR / "github_reporter_status.json"
 TELEMETRY_GITHUB_HEARTBEAT_FILE = TELEMETRY_DIR / "github_heartbeat_status.json"
 TELEMETRY_DIAGNOSTIC_SNAPSHOT_FILE = TELEMETRY_DIR / "diagnostic_snapshot.json"
+TELEMETRY_MODEL_UPDATER_BOOTSTRAP_FILE = TELEMETRY_DIR / "model_updater_bootstrap.json"
 TELEMETRY_SCHEMA_VERSION = 1
+
+# Automatic Qwen model-updater bootstrap. The controller only installs/starts
+# the small updater after verifying its SHA-256 from a public manifest. The
+# updater itself owns model/config changes and never kills LM Studio.
+AGENT_INSTALL_DIR = Path(__file__).resolve().parent
+MODEL_AUTO_UPDATER_FILE = AGENT_INSTALL_DIR / "qwen_model_auto_updater.py"
+MODEL_AUTO_UPDATER_STATE_FILE = AGENT_INSTALL_DIR / "model_auto_updater_state.json"
+MODEL_AUTO_UPDATER_MANIFEST_URL = (
+    "https://raw.githubusercontent.com/lucaluxa0-sys/qwen-roblox-controller/main/"
+    "agent/model_auto_updater_latest.json"
+)
+MODEL_AUTO_UPDATER_RAW_BASE = (
+    "https://raw.githubusercontent.com/lucaluxa0-sys/qwen-roblox-controller/main"
+)
+MODEL_AUTO_UPDATER_BOOTSTRAP_ENABLED = os.environ.get(
+    "QWEN_MODEL_AUTO_UPDATER_BOOTSTRAP_ENABLED", "1"
+) != "0"
 
 # Optional automatic GitHub failure handoff. No token is embedded in the
 # controller. The reporter uses the user's existing authenticated GitHub CLI
@@ -620,6 +638,7 @@ def telemetry_status_payload(state: dict[str, Any] | None = None) -> dict[str, A
             "github_reporter_status": str(TELEMETRY_GITHUB_REPORTER_FILE),
             "github_heartbeat_status": str(TELEMETRY_GITHUB_HEARTBEAT_FILE),
             "diagnostic_snapshot": str(TELEMETRY_DIAGNOSTIC_SNAPSHOT_FILE),
+            "model_updater_bootstrap": str(TELEMETRY_MODEL_UPDATER_BOOTSTRAP_FILE),
         },
     }
 
@@ -786,6 +805,136 @@ def _github_reporter_status(status: str, **fields: Any) -> None:
     except Exception as exc:
         log(f"github reporter status write failed: {exc!r}")
 
+
+
+
+_model_updater_bootstrap_started = False
+
+
+def _write_model_updater_bootstrap(status: str, **fields: Any) -> None:
+    try:
+        _atomic_write_json(TELEMETRY_MODEL_UPDATER_BOOTSTRAP_FILE, {
+            "schema_version": 1,
+            "generated_at": time.time(),
+            "controller_version": VERSION,
+            "status": status,
+            **fields,
+        })
+    except Exception:
+        pass
+
+
+def _fetch_public_bytes(url: str, timeout: int = 30) -> bytes:
+    sep = "&" if "?" in url else "?"
+    fresh_url = url + sep + "qwen_no_cache=" + str(int(time.time() * 1000))
+    req = urllib.request.Request(
+        fresh_url,
+        headers={
+            "User-Agent": f"QwenRobloxController/{VERSION}",
+            "Cache-Control": "no-cache",
+        },
+    )
+    with urllib.request.urlopen(req, timeout=timeout) as response:
+        return response.read()
+
+
+def _validate_model_updater_bootstrap_manifest(raw: Any) -> dict[str, str]:
+    if not isinstance(raw, dict):
+        raise RuntimeError("model updater manifest is not an object")
+    updater = raw.get("updater")
+    if not isinstance(updater, dict):
+        raise RuntimeError("model updater manifest missing updater section")
+    version = str(updater.get("version") or "").strip()
+    path = str(updater.get("path") or "").strip().lstrip("/")
+    expected = str(updater.get("sha256") or "").strip().lower()
+    if not version or not path or len(expected) != 64 or not re.fullmatch(r"[0-9a-f]{64}", expected):
+        raise RuntimeError("model updater manifest has invalid version/path/sha256")
+    return {"version": version, "path": path, "sha256": expected}
+
+
+def _model_updater_process_start() -> None:
+    kwargs: dict[str, Any] = {
+        "cwd": str(AGENT_INSTALL_DIR),
+        "stdin": subprocess.DEVNULL,
+        "stdout": subprocess.DEVNULL,
+        "stderr": subprocess.DEVNULL,
+    }
+    if os.name == "nt":
+        flags = 0
+        flags |= getattr(subprocess, "CREATE_NO_WINDOW", 0)
+        flags |= getattr(subprocess, "DETACHED_PROCESS", 0)
+        flags |= getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
+        kwargs["creationflags"] = flags
+    subprocess.Popen(
+        [sys.executable, str(MODEL_AUTO_UPDATER_FILE), "--watch"],
+        **kwargs,
+    )
+
+
+def _bootstrap_model_auto_updater() -> None:
+    if not MODEL_AUTO_UPDATER_BOOTSTRAP_ENABLED or os.name != "nt":
+        return
+    try:
+        manifest_raw = _fetch_public_bytes(MODEL_AUTO_UPDATER_MANIFEST_URL, timeout=30)
+        manifest = json.loads(manifest_raw.decode("utf-8-sig", errors="replace"))
+        spec = _validate_model_updater_bootstrap_manifest(manifest)
+        updater_url = MODEL_AUTO_UPDATER_RAW_BASE.rstrip("/") + "/" + spec["path"]
+        data = _fetch_public_bytes(updater_url, timeout=45)
+        actual = hashlib.sha256(data).hexdigest()
+        if actual != spec["sha256"]:
+            raise RuntimeError(
+                f"model updater SHA mismatch: expected {spec['sha256']}, got {actual}"
+            )
+
+        current = ""
+        if MODEL_AUTO_UPDATER_FILE.exists():
+            try:
+                current = hashlib.sha256(MODEL_AUTO_UPDATER_FILE.read_bytes()).hexdigest()
+            except Exception:
+                current = ""
+
+        installed = False
+        if current != actual:
+            stage = AGENT_INSTALL_DIR / ".qwen_model_auto_updater.new.py"
+            stage.write_bytes(data)
+            test = subprocess.run(
+                [sys.executable, "-m", "py_compile", str(stage)],
+                cwd=str(AGENT_INSTALL_DIR),
+                capture_output=True,
+                text=True,
+                timeout=30,
+            )
+            if test.returncode != 0:
+                stage.unlink(missing_ok=True)
+                raise RuntimeError(
+                    "model updater py_compile failed: "
+                    + (test.stderr or test.stdout or "")[-1000:]
+                )
+            os.replace(stage, MODEL_AUTO_UPDATER_FILE)
+            installed = True
+
+        _model_updater_process_start()
+        _write_model_updater_bootstrap(
+            "installed_started" if installed else "started",
+            updater_version=spec["version"],
+            updater_sha256=actual,
+            updater_file=str(MODEL_AUTO_UPDATER_FILE),
+        )
+    except Exception as exc:
+        _write_model_updater_bootstrap("failed", error=str(exc)[:1200])
+        log(f"model auto updater bootstrap failed: {exc!r}")
+
+
+def _start_model_auto_updater_bootstrap() -> None:
+    global _model_updater_bootstrap_started
+    if _model_updater_bootstrap_started or not MODEL_AUTO_UPDATER_BOOTSTRAP_ENABLED:
+        return
+    _model_updater_bootstrap_started = True
+    threading.Thread(
+        target=_bootstrap_model_auto_updater,
+        daemon=True,
+        name="qwen-model-auto-updater-bootstrap",
+    ).start()
 
 
 _github_heartbeat_lock = threading.Lock()
@@ -976,10 +1125,46 @@ def _public_gate(gate: Any) -> Any:
     }
 
 
+
+def _public_model_updater_state(raw: dict[str, Any]) -> dict[str, Any]:
+    keys = (
+        "schema_version", "updater_version", "status", "updated_at",
+        "applied_model_revision", "desired_model", "desired_identifier",
+        "context_length", "gpu", "autopilot_rollover_at", "download_status",
+        "config_changed", "last_check_at", "check_result",
+        "manifest_interval_seconds", "installed_updater_version",
+        "installed_updater_sha256",
+    )
+    out: dict[str, Any] = {}
+    for key in keys:
+        if key not in raw:
+            continue
+        value = raw.get(key)
+        if isinstance(value, str):
+            value = _public_safe_string(value, 700)
+        out[key] = value
+    activation = raw.get("activation")
+    if isinstance(activation, dict):
+        out["activation"] = {
+            "manager_version": _public_safe_string(activation.get("manager_version"), 80),
+            "model_loaded": bool(activation.get("model_loaded")),
+            "resolved_model_key": _public_safe_string(activation.get("resolved_model_key"), 200),
+            "model_boot_proven": bool(activation.get("model_boot_proven")),
+            "autopilot_running": bool(activation.get("autopilot_running")),
+            "autopilot_status": _public_safe_string(activation.get("autopilot_status"), 80),
+            "controller_live_version": _public_safe_string(activation.get("controller_live_version"), 80),
+            "activated": bool(activation.get("activated")),
+        }
+    if raw.get("error"):
+        out["error"] = _public_safe_string(raw.get("error"), 900)
+    return out
+
+
 def _diagnostic_snapshot() -> dict[str, Any]:
     install_dir = LOCALAPPDATA / "QwenRobloxAgent"
     full_auto = _read_json_file_safe(install_dir / "full_auto_health.json")
     autopilot = _read_json_file_safe(install_dir / "autopilot_supervisor_state.json")
+    model_updater = _read_json_file_safe(install_dir / "model_auto_updater_state.json")
     action_rows = _tail_jsonl_safe(TELEMETRY_ACTION_HISTORY_FILE, GITHUB_HEARTBEAT_ACTION_TAIL)
     failure_rows = _tail_jsonl_safe(TELEMETRY_FAILURE_HISTORY_FILE, GITHUB_HEARTBEAT_FAILURE_TAIL)
 
@@ -1018,6 +1203,7 @@ def _diagnostic_snapshot() -> dict[str, Any]:
         },
         "manager": _public_full_auto_health(full_auto),
         "autopilot": _public_autopilot_state(autopilot),
+        "model_updater": _public_model_updater_state(model_updater),
         "recent_actions": [_public_action_row(x) for x in action_rows],
         "recent_failures": [_public_failure_row(x) for x in failure_rows],
         "recent_autopilot_events": _safe_autopilot_log_tail(),
@@ -4209,6 +4395,7 @@ def status_payload() -> dict[str, Any]:
         "telemetry_test_results_file": str(TELEMETRY_TEST_RESULTS_FILE),
         "github_heartbeat_status_file": str(TELEMETRY_GITHUB_HEARTBEAT_FILE),
         "diagnostic_snapshot_file": str(TELEMETRY_DIAGNOSTIC_SNAPSHOT_FILE),
+        "model_updater_bootstrap_file": str(TELEMETRY_MODEL_UPDATER_BOOTSTRAP_FILE),
         "controller_health": controller_health_payload(),
         "important": (
             "Enforcement is automatic. The model does NOT need to call supervisor tools. "
@@ -5097,6 +5284,29 @@ def self_test_main() -> int:
     if "qwen-roblox-auto-heartbeat-v1" not in body:
         failures.append("V6.3.6 heartbeat marker missing")
 
+    # V6.3.7 regression: model-updater bootstrap manifest is hash-pinned and
+    # rejects malformed updater metadata before any local file can be replaced.
+    good_model_updater_manifest = {
+        "updater": {
+            "version": "1.0.0",
+            "path": "agent/model_auto_updater.py",
+            "sha256": "a" * 64,
+        }
+    }
+    try:
+        spec = _validate_model_updater_bootstrap_manifest(good_model_updater_manifest)
+        if spec.get("path") != "agent/model_auto_updater.py":
+            failures.append(f"V6.3.7 model-updater manifest path changed unexpectedly: {spec!r}")
+    except Exception as exc:
+        failures.append(f"V6.3.7 valid model-updater manifest rejected: {exc!r}")
+    try:
+        _validate_model_updater_bootstrap_manifest({
+            "updater": {"version": "1.0.0", "path": "agent/model_auto_updater.py", "sha256": "bad"}
+        })
+        failures.append("V6.3.7 invalid model-updater SHA was accepted")
+    except Exception:
+        pass
+
     # V6.3 regression: controller-bug packets are eligible for automatic
     # GitHub handoff, while non-controller failures are not.
     report_packet = dict(packet)
@@ -5194,6 +5404,7 @@ def main() -> int:
     threading.Thread(target=child_stdout_loop, args=(child,), daemon=True).start()
     threading.Thread(target=child_stderr_loop, args=(child,), daemon=True).start()
     _start_github_heartbeat_thread()
+    _start_model_auto_updater_bootstrap()
 
     try:
         for raw in sys.stdin:
