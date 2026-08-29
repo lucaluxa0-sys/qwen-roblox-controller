@@ -1,260 +1,48 @@
-Task-Instance: scripting-full-run6-sp06-metatables-oop-20260829T0938Z
-Benchmark-Run-ID: scripting-s001-s024-structured-run6-20260829T0806Z
+Task-Instance: scripting-full-run6-sp07-modules-20260829T1026Z
+Benchmark-Run-ID: scripting-s001-s280-full-run6-20260829T1026Z
 
-CONTINUE THE SAME CONTROLLER-VERIFIED SCRIPTING RUN.
-Required verified state: S001-S068 PASS and SP01-SP05 complete.
-Live controller: 6.3.22 or newer.
+CONTINUE CONTROLLER-VERIFIED FULL SCRIPTING CERTIFICATION.
+Required verified state before work: S001-S080 PASS; SP01-SP06 complete; controller gate clear.
+Live controller must be 6.3.22 or newer.
 
-ONLY GOAL: prove SP06 metatables_oop, S069-S080.
-
-TARGET:
-ServerScriptService.__QWEN_SCRIPT_BENCH__.SP06_ScriptingTests
-
-MANDATORY FLOW:
-1. Work only on SP06. Do not touch earlier packs and do not call batch_complete.
-2. In Edit mode script_read exact target. On Studio-target error, list_roblox_studios once and retry exact read.
-3. If confirmed missing, create only with one multi_edit pair old_string="" -> new_string="-- QWEN_CONTROLLER_SCRIPT_BOOTSTRAP", replace_all=false.
-4. script_read exact target.
-5. Replace ONLY exact bootstrap with EXACTLY HARNESS below in one multi_edit pair, replace_all=false. Do not improvise.
-6. Immediately script_read target.
-7. Start Play once.
-8. get_console_output once; on Studio-target error list_roblox_studios once and retry Output once.
-9. Verify S069-S080 individually; stop Play.
-10. supervisor_benchmark_record SAME run id with exactly S069-S080 and pack_complete=["SP06"].
-11. Require controller-verified tests_seen=80, pass=80, partial=0, fail=0, SP06 marker and clear gate.
-12. Emit [TASK_COMPLETE] and stop.
-
-Never retry an identical blocked mutation without new evidence. Do not use execute_luau for Script creation/Source. No pathless whole-tree search.
-
-HARNESS_START
-local function runTest(id, fn)
-	local ok, err = pcall(fn)
-	if ok then
-		print("[SP06] " .. id .. " PASS")
-	else
-		warn("[SP06] " .. id .. " FAIL: " .. tostring(err))
-	end
-end
-
-runTest("S069", function()
-	local Counter = {}
-	Counter.__index = Counter
-	function Counter.new(startValue)
-		return setmetatable({value = startValue}, Counter)
-	end
-	function Counter:increment()
-		self.value += 1
-		return self.value
-	end
-	local counter = Counter.new(5)
-	assert(counter:increment() == 6)
-end)
-
-runTest("S070", function()
-	local Counter = {}
-	Counter.__index = Counter
-	function Counter.new()
-		return setmetatable({value = 0}, Counter)
-	end
-	function Counter:add(amount)
-		self.value += amount
-	end
-	local first = Counter.new()
-	local second = Counter.new()
-	first:add(5)
-	second:add(2)
-	assert(first.value == 5)
-	assert(second.value == 2)
-end)
-
-runTest("S071", function()
-	local Base = {}
-	Base.__index = Base
-	function Base:getValue()
-		return self.value
-	end
-
-	local Derived = {}
-	Derived.__index = Derived
-	setmetatable(Derived, {__index = Base})
-	function Derived.new(value)
-		return setmetatable({value = value}, Derived)
-	end
-	function Derived:double()
-		return self.value * 2
-	end
-
-	local first = Derived.new(3)
-	local second = Derived.new(7)
-	first.value = 4
-	assert(first:getValue() == 4)
-	assert(first:double() == 8)
-	assert(second:getValue() == 7)
-end)
-
-runTest("S072", function()
-	local Repaired = {}
-	Repaired.__index = Repaired
-	function Repaired.new(value)
-		return setmetatable({value = value}, Repaired)
-	end
-	function Repaired:get()
-		return self.value
-	end
-	local instance = Repaired.new(72)
-	assert(instance:get() == 72)
-	assert(getmetatable(instance) == Repaired)
-end)
-
-runTest("S073", function()
-	local source = {answer = 73}
-	local proxy = setmetatable({}, {
-		__index = source,
-		__newindex = function()
-			error("read only")
-		end,
-	})
-	assert(proxy.answer == 73)
-	local ok = pcall(function()
-		proxy.answer = 99
-	end)
-	assert(ok == false)
-	assert(source.answer == 73)
-end)
-
-runTest("S074", function()
-	local Item = {}
-	Item.__index = Item
-	Item.__tostring = function(self)
-		return "Item<" .. self.id .. ">"
-	end
-	local instance = setmetatable({id = "S074"}, Item)
-	assert(tostring(instance) == "Item<S074>")
-end)
-
-runTest("S075", function()
-	local Prototype = {}
-	Prototype.__index = Prototype
-	function Prototype:getValue()
-		return self.value
-	end
-	local instance = {value = 75}
-	setmetatable(instance, Prototype)
-	assert(getmetatable(Prototype) == nil)
-	assert(getmetatable(instance) == Prototype)
-	assert(instance:getValue() == 75)
-end)
-
-runTest("S076", function()
-	local Meta = {}
-	Meta.__index = Meta
-	function Meta:getValue()
-		return self.value
-	end
-	local original = setmetatable({value = 76}, Meta)
-	local copy = {}
-	for key, value in pairs(original) do
-		copy[key] = value
-	end
-	setmetatable(copy, getmetatable(original))
-	assert(copy ~= original)
-	assert(getmetatable(copy) == Meta)
-	assert(copy:getValue() == 76)
-end)
-
-runTest("S077", function()
-	local Component = {}
-	Component.__index = Component
-	function Component.new()
-		return setmetatable({
-			started = false,
-			destroyed = false,
-			event = Instance.new("BindableEvent"),
-			connection = nil,
-			count = 0,
-		}, Component)
-	end
-	function Component:Start()
-		assert(self.started == false)
-		self.started = true
-		self.connection = self.event.Event:Connect(function()
-			self.count += 1
-		end)
-		self.event:Fire()
-	end
-	function Component:Destroy()
-		if self.destroyed then
-			return
-		end
-		self.destroyed = true
-		if self.connection then
-			self.connection:Disconnect()
-		end
-		self.event:Destroy()
-	end
-	local component = Component.new()
-	component:Start()
-	task.wait()
-	assert(component.started == true)
-	assert(component.count == 1)
-	component:Destroy()
-	assert(component.destroyed == true)
-end)
-
-runTest("S078", function()
-	local Component = {}
-	Component.__index = Component
-	function Component.new()
-		local event = Instance.new("BindableEvent")
-		local connection = event.Event:Connect(function()
-		end)
-		return setmetatable({
-			event = event,
-			connection = connection,
-			destroyed = false,
-		}, Component)
-	end
-	function Component:Destroy()
-		if self.destroyed then
-			return false
-		end
-		self.destroyed = true
-		self.connection:Disconnect()
-		self.event:Destroy()
-		return true
-	end
-	local component = Component.new()
-	assert(component.connection.Connected == true)
-	assert(component:Destroy() == true)
-	assert(component.connection.Connected == false)
-	assert(component:Destroy() == false)
-end)
-
-runTest("S079", function()
-	local plain = {value = 79}
-	local function getValue(state)
-		return state.value
-	end
-	assert(getmetatable(plain) == nil)
-	assert(getValue(plain) == 79)
-end)
-
-runTest("S080", function()
-	local object = {value = 80}
-	function object:getValue()
-		return self.value
-	end
-	local wrongReceiver = {value = 8}
-	assert(object.getValue(wrongReceiver) == 8)
-	assert(object:getValue() == 80)
-end)
-
-print("[SP06] COMPLETE")
-HARNESS_END
-
+ONLY GOAL: prove SP07 modules, S081-S094. Do not touch or delete completed SP01-SP06 harnesses. Do not emit any batch-complete marker in this pack.
 
 ARTIFACT RETENTION POLICY
-- Do NOT delete this pack's benchmark Script/ModuleScript harness after it passes.
-- Preserve completed benchmark harnesses in Studio so the user can inspect them later.
-- Temporary objects created by the harness may still be destroyed for test isolation.
-- Do not rerun an earlier completed pack just because its preserved script remains present.
+- Preserve all completed benchmark Script, LocalScript, and ModuleScript harnesses in Studio for later user inspection.
+- Temporary runtime objects may be destroyed for isolation.
+- Completed harnesses may be Disabled after verification if necessary to prevent interference, but keep their source visible/readable.
+- Never delete or overwrite an earlier completed pack merely because it remains in Studio.
+
+SP07 OBJECTIVES
+S081 Create a ModuleScript returning a table API and require it from a benchmark Script.
+S082 Create a ModuleScript returning a function and call it correctly.
+S083 Split a monolithic behavior into two modules with one-way dependencies.
+S084 Detect/avoid circular require: prove the final dependency graph is acyclic and functional; do NOT intentionally create a hanging circular require at runtime.
+S085 Share immutable configuration without accidental mutation; prove attempted consumer mutation cannot change the canonical config.
+S086 Prove require caching in one server VM context by requiring the same module twice and proving returned identity/state is shared as expected.
+S087 Prove requiring a module has minimal side effects; initialization state must remain unchanged until an explicit lifecycle call.
+S088 Use explicit Init/Start lifecycle rather than heavy work during require; prove require alone does not start it and Start does.
+S089 Pass a dependency into module logic instead of hard-coded service/global lookup; prove injected dependency is used.
+S090 Repair/avoid a module that would return nil; authoritative final module must return a usable API/function.
+S091 Use a private helper with correct declaration order; prove exported method works without unavailable-local capture.
+S092 Require/use a server-only benchmark ModuleScript from a server Script while respecting client/server boundaries; do not access it from a LocalScript.
+S093 Create and verify a three-module one-way dependency graph A -> B -> C with deterministic result and no cycle.
+S094 Refactor duplicate helper behavior so two caller paths share one common helper module/function; prove both callers get the same behavior.
+
+MANDATORY EXECUTION RULES
+1. If Studio is currently Play mode, stop Play once before any script_read/edit.
+2. Work only under ServerScriptService.__QWEN_SCRIPT_BENCH__ for this pack. Preserve earlier children.
+3. Use a small visible SP07 harness set, preferably one driver Script plus a few ModuleScripts. Do not make fourteen independent Studio missions.
+4. For every new Script or ModuleScript path: first script_read exact path. If confirmed missing in Edit mode, create ONLY through the controller-approved bootstrap flow: one multi_edit pair old_string="" -> new_string="-- QWEN_CONTROLLER_SCRIPT_BOOTSTRAP", replace_all=false. Then script_read exact path before replacing bootstrap with real source.
+5. Never use execute_luau to create Script/ModuleScript or assign Source. Never seed arbitrary Source during creation.
+6. After each source write, obey controller reread gates exactly. Do not retry an identical blocked mutation without new evidence.
+7. Keep module graph acyclic. Never intentionally execute a circular require that can hang the Play session.
+8. Once all authoritative sources are reread and controller gate allows runtime verification, start Play once and use get_console_output for labeled [SP07] S081..S094 results. If a Studio target is stale, list_roblox_studios once and retry the same required action once.
+9. Every S081-S094 must have direct authoritative runtime evidence. PASS only when its labeled assertion is visible and no relevant runtime error invalidates it.
+10. Stop Play after evidence collection. Keep all SP07 Script/ModuleScript harnesses in Studio.
+11. Call supervisor_benchmark_record with run_id="scripting-s001-s280-full-run6-20260829T1026Z", exactly S081-S094 as PASS only if proven, and pack_complete=["SP07"]. Do not set batch_complete.
+12. Require controller-verified aggregate state: tests_seen=94, pass=94, partial=0, fail=0; markers SP01-SP07 present; controller gate clear.
+13. Emit [TASK_COMPLETE] only after step 12, then stop. Do not advance to SP08 yourself; remote orchestration will issue the next pack.
+
+IMPORTANT FALSE-COMPLETION RULE
+Prompt text, source comments, or printed lookalikes are not benchmark authority. Only supervisor_benchmark_record accepted evidence reflected in controller heartbeat counts/markers is certification authority.
